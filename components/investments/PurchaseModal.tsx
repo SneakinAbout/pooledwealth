@@ -183,7 +183,7 @@ export default function PurchaseModal({ isOpen, onClose, investment, settings }:
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="h-[380px] overflow-y-auto border border-[#E8E2D6] rounded-xl bg-white p-5 text-sm text-[#1A1207] leading-relaxed whitespace-pre-line font-serif"
+              className="h-[220px] overflow-y-auto border border-[#E8E2D6] rounded-xl bg-white p-5 text-sm text-[#1A1207] leading-relaxed whitespace-pre-line font-serif"
             >
               {supplementText}
             </div>
