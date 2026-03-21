@@ -106,6 +106,15 @@ export async function sendEmailVerification(to: string, name: string, token: str
   `));
 }
 
+export async function sendSupplementFinalised(to: string, name: string, investmentTitle: string, investmentId: string) {
+  await send(to, `Your ownership in ${investmentTitle} has been confirmed`, base(`
+    <p>Hi ${name},</p>
+    <p>Your ownership in <strong>${investmentTitle}</strong> has been confirmed. Your Co-Ownership Supplement has been finalised and is now available in My Documents.</p>
+    <p>You can download your finalised supplement, which includes the confirmed ownership register, from your account settings.</p>
+    <a href="${APP_URL}/investor/settings" style="display:inline-block;background:#1A2B1F;color:#C9A84C;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">View My Documents</a>
+  `));
+}
+
 export async function sendInvestmentUpdate(to: string, name: string, investmentTitle: string, updateTitle: string, investmentId: string) {
   await send(to, `Update: ${investmentTitle}`, base(`
     <p>Hi ${name},</p>

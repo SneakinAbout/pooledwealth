@@ -11,7 +11,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { calculateDistributionFees } from '@/lib/fees';
-import { DollarSign, CheckCircle, AlertTriangle, Lock, Unlock } from 'lucide-react';
+import { DollarSign, CheckCircle, AlertTriangle, Lock, Unlock, FileCheck } from 'lucide-react';
 
 interface PreviousDistribution {
   id: string;
@@ -60,6 +60,8 @@ export default function InvestmentAdminSection({
   const [showRefund, setShowRefund] = useState(false);
   const [showAutoAllocate, setShowAutoAllocate] = useState(false);
   const [showLock, setShowLock] = useState(false);
+  const [showFinalise, setShowFinalise] = useState(false);
+  const [finaliseLoading, setFinaliseLoading] = useState(false);
 
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -122,6 +124,22 @@ export default function InvestmentAdminSection({
       toast.error(err instanceof Error ? err.message : 'Refund failed');
     } finally {
       setStatusLoading(false);
+    }
+  };
+
+  const handleFinaliseSupplements = async () => {
+    setFinaliseLoading(true);
+    try {
+      const res = await fetch(`/api/admin/investments/${investmentId}/finalise`, { method: 'POST' });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      toast.success(`${result.finalisedCount} supplement${result.finalisedCount !== 1 ? 's' : ''} finalised. Co-owners notified.`);
+      setShowFinalise(false);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Finalise failed');
+    } finally {
+      setFinaliseLoading(false);
     }
   };
 
@@ -245,6 +263,18 @@ export default function InvestmentAdminSection({
           <Button variant="danger" size="sm" onClick={() => setShowArchive(true)} disabled={statusLoading}>
             Archive
           </Button>
+          {(status === 'CLOSED' || subscriptionEnded) && holdingsCount > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowFinalise(true)}
+              disabled={finaliseLoading}
+              className="flex items-center gap-1.5"
+            >
+              <FileCheck className="h-3 w-3" />
+              Finalise Supplements
+            </Button>
+          )}
         </div>
       </div>
 
@@ -486,6 +516,15 @@ export default function InvestmentAdminSection({
         confirmLabel={locked ? 'Unlock' : 'Lock Investment'}
         variant={locked ? undefined : 'warning'}
         loading={lockLoading}
+      />
+      <ConfirmDialog
+        isOpen={showFinalise}
+        onClose={() => setShowFinalise(false)}
+        onConfirm={handleFinaliseSupplements}
+        title="Finalise Co-Ownership Supplements"
+        message={`This will finalise all PENDING supplements for this investment, populate the anonymous ownership register, and notify each co-owner by email. This action cannot be undone.`}
+        confirmLabel="Finalise Supplements"
+        loading={finaliseLoading}
       />
     </div>
   );

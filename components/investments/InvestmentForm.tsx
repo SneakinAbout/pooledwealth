@@ -54,6 +54,12 @@ export default function InvestmentForm({ initial, mode }: InvestmentFormProps) {
       startDate: initial?.startDate ?? new Date().toISOString().split('T')[0],
       endDate: initial?.endDate ?? '',
       imageUrl: initial?.imageUrl ?? '',
+      edition: initial?.edition ?? '',
+      grade: initial?.grade ?? '',
+      gradingCompany: initial?.gradingCompany ?? '',
+      certNumber: initial?.certNumber ?? '',
+      acquisitionPrice: initial?.acquisitionPrice ?? undefined,
+      acquisitionDate: initial?.acquisitionDate ?? '',
     },
   });
 
@@ -198,6 +204,59 @@ export default function InvestmentForm({ initial, mode }: InvestmentFormProps) {
             {...register('imageUrl')}
           />
         </div>
+
+        {/* Asset identification — used in Co-Ownership Supplement documents */}
+        <div className="md:col-span-2 pt-2">
+          <p className="text-sm font-semibold text-[#1A1207] mb-1">Asset Identification</p>
+          <p className="text-xs text-[#8A7A60] mb-4">Used to populate the Co-Ownership Supplement at time of purchase.</p>
+        </div>
+
+        <Input
+          label="Edition (optional)"
+          placeholder="e.g. 1st Edition, Shadowless"
+          error={errors.edition?.message}
+          {...register('edition')}
+        />
+
+        <Input
+          label="Grade (optional)"
+          placeholder="e.g. PSA 10, BGS 9.5"
+          error={errors.grade?.message}
+          {...register('grade')}
+        />
+
+        <Input
+          label="Grading Company (optional)"
+          placeholder="e.g. PSA, BGS, CGC"
+          error={errors.gradingCompany?.message}
+          {...register('gradingCompany')}
+        />
+
+        <Input
+          label="Certificate Number (optional)"
+          placeholder="e.g. 12345678"
+          error={errors.certNumber?.message}
+          {...register('certNumber')}
+        />
+
+        <Input
+          label="Admin Acquisition Price (optional)"
+          type="number"
+          min={0.01}
+          step={0.01}
+          placeholder="0.00"
+          hint="What Admin paid to acquire this asset"
+          error={errors.acquisitionPrice?.message}
+          {...register('acquisitionPrice', { valueAsNumber: true })}
+        />
+
+        <Input
+          label="Admin Acquisition Date (optional)"
+          type="date"
+          hint="When Admin acquired this asset"
+          error={errors.acquisitionDate?.message}
+          {...register('acquisitionDate')}
+        />
       </div>
 
       <div className="flex gap-4 pt-2">

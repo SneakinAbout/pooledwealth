@@ -79,6 +79,18 @@ export async function PUT(
     if (data.startDate) updateData.startDate = new Date(data.startDate);
     if (data.endDate) updateData.endDate = new Date(data.endDate);
     if (data.imageUrl === '') updateData.imageUrl = null;
+    if (data.acquisitionDate === '' || data.acquisitionDate === undefined) {
+      updateData.acquisitionDate = null;
+    } else if (data.acquisitionDate) {
+      updateData.acquisitionDate = new Date(data.acquisitionDate);
+    }
+    if (data.acquisitionPrice === undefined || isNaN(data.acquisitionPrice as number)) {
+      delete updateData.acquisitionPrice;
+    }
+    if (data.edition === '') updateData.edition = null;
+    if (data.grade === '') updateData.grade = null;
+    if (data.gradingCompany === '') updateData.gradingCompany = null;
+    if (data.certNumber === '') updateData.certNumber = null;
 
     const investment = await prisma.investment.update({
       where: { id: params.id },

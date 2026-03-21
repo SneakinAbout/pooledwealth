@@ -5,9 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/permissions';
 import { rateLimit } from '@/lib/rateLimit';
 import { z } from 'zod';
+import { generateSupplementText, SUPPLEMENT_VERSION } from '@/lib/supplementText';
 
 const purchaseBodySchema = z.object({
   units: z.number().int().positive(),
+  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
 });
 
 export async function POST(
@@ -23,6 +25,17 @@ export async function POST(
       return NextResponse.json({ error: 'KYC approval required to invest' }, { status: 403 });
     }
 
+    // Check master agreement exists
+    const masterAgreement = await prisma.masterAgreement.findUnique({
+      where: { userId: session!.user.id },
+    });
+    if (!masterAgreement) {
+      return NextResponse.json(
+        { error: 'You must sign the Master Co-Ownership Agreement before purchasing.', requiresAgreement: true },
+        { status: 403 }
+      );
+    }
+
     // Rate limit: 20 purchases per hour per user
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ?? 'unknown';
     if (!rateLimit(`purchase:${session!.user.id}:${ip}`, 20, 60 * 60 * 1000)) {
@@ -35,7 +48,7 @@ export async function POST(
       return NextResponse.json({ error: result.error.errors[0].message }, { status: 400 });
     }
 
-    const { units } = result.data;
+    const { units, fullName } = result.data;
 
     // Fast pre-check for early UX feedback (non-authoritative)
     const investment = await prisma.investment.findUnique({ where: { id: params.id } });
@@ -66,7 +79,7 @@ export async function POST(
     });
 
     // All authoritative checks + writes inside a single transaction to prevent race conditions
-    const [holding, transaction] = await prisma.$transaction(async (tx) => {
+    const [holding, transaction, supplement] = await prisma.$transaction(async (tx) => {
       // Re-fetch inside transaction for authoritative, consistent state
       const freshInvestment = await tx.investment.findUnique({ where: { id: params.id } });
 
@@ -128,7 +141,7 @@ export async function POST(
             },
           });
 
-      const transaction = await tx.transaction.create({
+      const txRecord = await tx.transaction.create({
         data: {
           userId: session!.user.id,
           investmentId: params.id,
@@ -139,10 +152,43 @@ export async function POST(
         },
       });
 
-      return [holding, transaction];
+      // Generate and store the supplement
+      const ownershipPercentage = (units / freshInvestment.totalUnits) * 100;
+      const agreementText = generateSupplementText({
+        assetName: freshInvestment.title,
+        edition: freshInvestment.edition,
+        grade: freshInvestment.grade,
+        gradingCompany: freshInvestment.gradingCompany,
+        certNumber: freshInvestment.certNumber,
+        acquisitionDate: freshInvestment.acquisitionDate?.toISOString() ?? null,
+        acquisitionPrice: freshInvestment.acquisitionPrice ? Number(freshInvestment.acquisitionPrice) : null,
+        totalShares: freshInvestment.totalUnits,
+        sharesPurchased: units,
+        sharePrice: Number(freshInvestment.pricePerUnit),
+        ownershipPercentage,
+        roundCloseDate: freshInvestment.endDate.toISOString(),
+        coOwnerName: fullName,
+      });
+
+      const supplement = await tx.assetSupplement.create({
+        data: {
+          userId: session!.user.id,
+          investmentId: params.id,
+          sharesPurchased: units,
+          totalShares: freshInvestment.totalUnits,
+          ownershipPercentage,
+          fullNameAtSigning: fullName,
+          ipAddress: ip,
+          agreementVersion: SUPPLEMENT_VERSION,
+          agreementText,
+          status: 'PENDING',
+        },
+      });
+
+      return [holding, txRecord, supplement];
     });
 
-    return NextResponse.json({ success: true, holding, transaction }, { status: 201 });
+    return NextResponse.json({ success: true, holding, transaction, supplementId: supplement.id }, { status: 201 });
   } catch (err) {
     const e = err as { status?: number; message?: string; insufficientFunds?: boolean };
     if (e.status) {

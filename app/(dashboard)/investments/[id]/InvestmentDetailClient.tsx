@@ -43,6 +43,13 @@ interface Investment {
   imageUrl?: string | null;
   createdBy: { name: string };
   _count: { holdings: number };
+  // Asset identification for supplement
+  edition?: string | null;
+  grade?: string | null;
+  gradingCompany?: string | null;
+  certNumber?: string | null;
+  acquisitionPrice?: number | null;
+  acquisitionDate?: string | null;
 }
 
 interface AdminData {
@@ -296,6 +303,14 @@ export default function InvestmentDetailClient({ investment, settings, canInvest
           pricePerUnit: investment.pricePerUnit,
           minimumUnits: investment.minimumUnits,
           availableUnits: investment.availableUnits,
+          totalUnits: investment.totalUnits,
+          endDate: typeof investment.endDate === 'string' ? investment.endDate : new Date(investment.endDate).toISOString(),
+          edition: investment.edition,
+          grade: investment.grade,
+          gradingCompany: investment.gradingCompany,
+          certNumber: investment.certNumber,
+          acquisitionPrice: investment.acquisitionPrice,
+          acquisitionDate: investment.acquisitionDate,
         }}
         settings={settings}
       />

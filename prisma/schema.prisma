@@ -107,6 +107,7 @@ model User {
   emailVerifyTokens     EmailVerifyToken[]
   investmentUpdates     InvestmentUpdate[]
   masterAgreement       MasterAgreement?
+  assetSupplements      AssetSupplement[]
 
   @@map("users")
 }
@@ -161,17 +162,26 @@ model Investment {
   reservePrice   Decimal?         @db.Decimal(18, 2)
   currentValue   Decimal?         @db.Decimal(18, 2) // admin/manager updated valuation
 
+  // Asset identification fields for supplement documents
+  edition          String?
+  grade            String?
+  gradingCompany   String?
+  certNumber       String?
+  acquisitionPrice Decimal?  @db.Decimal(18, 2)
+  acquisitionDate  DateTime?
+
   createdById String
   createdBy   User             @relation(fields: [createdById], references: [id])
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  holdings      Holding[]
-  transactions  Transaction[]
-  distributions Distribution[]
-  proposals     Proposal[]
-  updates       InvestmentUpdate[]
-  watchlistItems WatchlistItem[]
+  holdings         Holding[]
+  transactions     Transaction[]
+  distributions    Distribution[]
+  proposals        Proposal[]
+  updates          InvestmentUpdate[]
+  watchlistItems   WatchlistItem[]
+  assetSupplements AssetSupplement[]
 
   @@index([status])
   @@index([createdAt])
@@ -410,6 +420,30 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model AssetSupplement {
+  id                     String    @id @default(cuid())
+  userId                 String
+  investmentId           String
+  sharesPurchased        Int
+  totalShares            Int
+  ownershipPercentage    Decimal   @db.Decimal(8, 4)
+  fullNameAtSigning      String
+  signedAt               DateTime  @default(now())
+  ipAddress              String
+  agreementVersion       String    @default("ACS-v1.0")
+  agreementText          String    @db.Text
+  status                 String    @default("PENDING")
+  finalisedAt            DateTime?
+  finalOwnershipRegister Json?
+
+  user       User       @relation(fields: [userId], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@index([userId])
+  @@index([investmentId])
+  @@map("asset_supplements")
 }
 
 model MasterAgreement {

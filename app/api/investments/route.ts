@@ -73,6 +73,12 @@ export async function POST(request: NextRequest) {
         imageUrl: data.imageUrl || null,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
+        edition: data.edition || null,
+        grade: data.grade || null,
+        gradingCompany: data.gradingCompany || null,
+        certNumber: data.certNumber || null,
+        acquisitionDate: data.acquisitionDate ? new Date(data.acquisitionDate) : null,
+        acquisitionPrice: data.acquisitionPrice ?? null,
         createdById: session!.user.id,
       },
     });

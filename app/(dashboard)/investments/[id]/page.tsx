@@ -97,6 +97,8 @@ export default async function InvestmentDetailPage({
         currentValue: investment.currentValue ? Number(investment.currentValue) : null,
         endDate: investment.endDate.toISOString(),
         startDate: investment.startDate.toISOString(),
+        acquisitionPrice: investment.acquisitionPrice ? Number(investment.acquisitionPrice) : null,
+        acquisitionDate: investment.acquisitionDate ? investment.acquisitionDate.toISOString() : null,
       }}
       settings={feeSettings}
       canInvest={canInvest}

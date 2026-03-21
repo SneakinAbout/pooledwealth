@@ -30,6 +30,13 @@ export const investmentSchemaBase = z.object({
   startDate: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid start date'),
   endDate: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid end date'),
   imageUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+  // Asset identification fields for supplement documents
+  edition: z.string().optional().or(z.literal('')),
+  grade: z.string().optional().or(z.literal('')),
+  gradingCompany: z.string().optional().or(z.literal('')),
+  certNumber: z.string().optional().or(z.literal('')),
+  acquisitionPrice: z.number().positive('Acquisition price must be positive').optional(),
+  acquisitionDate: z.string().refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid acquisition date').optional().or(z.literal('')),
 });
 
 // Full schema with cross-field date validation — use for creates
