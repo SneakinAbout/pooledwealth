@@ -27,9 +27,9 @@ export async function POST(
       return NextResponse.json({ error: 'No pending supplements found for this investment' }, { status: 400 });
     }
 
-    // Build anonymous ownership register
+    // Build anonymous ownership register — platform allocation gets its own ref
     const finalOwnershipRegister = pendingSupplements.map((s, index) => ({
-      co_owner_ref: `CO-${String(index + 1).padStart(3, '0')}`,
+      co_owner_ref: s.ipAddress === 'system' ? 'PLATFORM' : `CO-${String(index + 1).padStart(3, '0')}`,
       shares: s.sharesPurchased,
       percentage: `${Number(s.ownershipPercentage).toFixed(4)}%`,
     }));
@@ -46,13 +46,15 @@ export async function POST(
       },
     });
 
-    // Send email notifications (non-blocking — fire and forget)
+    // Send email notifications to real investors only (skip system/platform allocation)
     Promise.all(
-      pendingSupplements.map((s) =>
-        sendSupplementFinalised(s.user.email, s.user.name, investment.title, investment.id).catch((err) =>
-          console.error(`Failed to send supplement finalised email to ${s.user.email}:`, err)
+      pendingSupplements
+        .filter((s) => s.ipAddress !== 'system')
+        .map((s) =>
+          sendSupplementFinalised(s.user.email, s.user.name, investment.title, investment.id).catch((err) =>
+            console.error(`Failed to send supplement finalised email to ${s.user.email}:`, err)
+          )
         )
-      )
     );
 
     return NextResponse.json({

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { generateSupplementText, SUPPLEMENT_VERSION } from '@/lib/supplementText';
 
 /**
  * Refunds all investors in an investment and resets it to DRAFT for re-listing.
@@ -81,8 +82,26 @@ export async function autoAllocateToPlatform(investmentId: string): Promise<{ un
 
   const units = investment.availableUnits;
   const notionalCostBasis = Number(investment.pricePerUnit) * units;
+  const ownershipPercentage = (units / investment.totalUnits) * 100;
+
+  const agreementText = generateSupplementText({
+    assetName: investment.title,
+    edition: investment.edition,
+    grade: investment.grade,
+    gradingCompany: investment.gradingCompany,
+    certNumber: investment.certNumber,
+    acquisitionDate: investment.acquisitionDate ? investment.acquisitionDate.toISOString() : null,
+    acquisitionPrice: investment.acquisitionPrice ? Number(investment.acquisitionPrice) : null,
+    totalShares: investment.totalUnits,
+    sharesPurchased: units,
+    sharePrice: Number(investment.pricePerUnit),
+    ownershipPercentage,
+    roundCloseDate: investment.endDate ? investment.endDate.toISOString() : new Date().toISOString(),
+    coOwnerName: 'Pooled Wealth Platform',
+  });
 
   await prisma.$transaction(async (tx) => {
+    // Create or update holding
     const existingHolding = await tx.holding.findFirst({
       where: { userId: platformUser.id, investmentId },
     });
@@ -102,6 +121,38 @@ export async function autoAllocateToPlatform(investmentId: string): Promise<{ un
           investmentId,
           unitsPurchased: units,
           purchasePrice: notionalCostBasis,
+        },
+      });
+    }
+
+    // Create or update supplement for the platform allocation
+    const existingSupplement = await tx.assetSupplement.findFirst({
+      where: { userId: platformUser.id, investmentId },
+    });
+
+    if (existingSupplement) {
+      await tx.assetSupplement.update({
+        where: { id: existingSupplement.id },
+        data: {
+          sharesPurchased: { increment: units },
+          ownershipPercentage,
+          agreementText,
+          status: 'PENDING',
+        },
+      });
+    } else {
+      await tx.assetSupplement.create({
+        data: {
+          userId: platformUser.id,
+          investmentId,
+          sharesPurchased: units,
+          totalShares: investment.totalUnits,
+          ownershipPercentage,
+          fullNameAtSigning: 'Pooled Wealth Platform',
+          ipAddress: 'system',
+          agreementVersion: SUPPLEMENT_VERSION,
+          agreementText,
+          status: 'PENDING',
         },
       });
     }
