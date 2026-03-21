@@ -74,11 +74,15 @@ export default function InvestorSettingsPage() {
 
   async function save(section: string, data: Record<string, string | null>) {
     setSaving(section);
+    // Convert empty strings to null so optional Zod fields don't fail
+    const cleaned = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, v === '' ? null : v])
+    );
     try {
       const res = await fetch('/api/investor/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(cleaned),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -349,7 +353,11 @@ export default function InvestorSettingsPage() {
                 <label className="block text-xs font-medium text-[#6A5A40] uppercase tracking-widest mb-1.5">BSB</label>
                 <Input
                   value={bank.bankBsb}
-                  onChange={(e) => setBank((b) => ({ ...b, bankBsb: e.target.value }))}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    if (val.length > 3) val = val.slice(0, 3) + '-' + val.slice(3);
+                    setBank((b) => ({ ...b, bankBsb: val }));
+                  }}
                   placeholder="e.g. 062-000"
                   maxLength={7}
                 />
