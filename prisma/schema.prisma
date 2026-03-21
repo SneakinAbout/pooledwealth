@@ -106,6 +106,7 @@ model User {
   passwordResetTokens   PasswordResetToken[]
   emailVerifyTokens     EmailVerifyToken[]
   investmentUpdates     InvestmentUpdate[]
+  masterAgreement       MasterAgreement?
 
   @@map("users")
 }
@@ -409,4 +410,18 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model MasterAgreement {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  fullNameAtSigning  String
+  agreedAt           DateTime @default(now())
+  ipAddress          String
+  agreementVersion   String
+  agreementText      String   @db.Text
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("master_agreements")
 }

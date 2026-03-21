@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,12 @@ export default async function InvestmentDetailPage({
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === 'ADMIN';
   const isManager = session?.user?.role === 'MANAGER';
+
+  // Gate: logged-in investors must have signed the Master Agreement
+  if (session?.user && !isAdmin && !isManager) {
+    const agreement = await prisma.masterAgreement.findUnique({ where: { userId: session.user.id } });
+    if (!agreement) redirect('/investor/agreement');
+  }
 
   const [investment, settings] = await Promise.all([
     prisma.investment.findUnique({

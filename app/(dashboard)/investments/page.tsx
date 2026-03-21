@@ -3,6 +3,7 @@ import InvestmentCard from '@/components/investments/InvestmentCard';
 
 export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { Search, SlidersHorizontal, PackageSearch } from 'lucide-react';
 
@@ -19,6 +20,12 @@ export default async function InvestmentsPage({ searchParams }: { searchParams: 
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user.role === 'ADMIN';
   const isManager = session?.user.role === 'MANAGER';
+
+  // Gate: logged-in users must have signed the Master Agreement
+  if (session?.user && !isAdmin && !isManager) {
+    const agreement = await prisma.masterAgreement.findUnique({ where: { userId: session.user.id } });
+    if (!agreement) redirect('/investor/agreement');
+  }
 
   // Active investments filter (non-ARCHIVED shown to all; ARCHIVED only to admin/manager)
   const activeWhere: Record<string, unknown> = { status: { not: 'ARCHIVED' } };

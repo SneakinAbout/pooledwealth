@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { User, MapPin, Shield, Phone, Calendar, ChevronDown, Landmark, Lock, Briefcase } from 'lucide-react';
+import MyDocuments from '@/components/investor/MyDocuments';
 import { Card } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -507,6 +508,8 @@ export default function InvestorSettingsPage() {
           </Button>
         </div>
       </Card>
+
+      <MyDocuments />
     </div>
   );
 }
