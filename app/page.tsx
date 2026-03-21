@@ -11,7 +11,7 @@ const features = [
   { icon: Layers, title: 'Fractional Ownership', desc: 'Buy as little as one share in high-value collectibles previously out of reach.' },
   { icon: Shield, title: 'Fully Authenticated', desc: 'Every item is professionally graded, authenticated, and held in secure storage.' },
   { icon: TrendingUp, title: 'Track Performance', desc: 'Watch your share value grow as the market for rare collectibles continues to surge.' },
-  { icon: Users, title: 'Pool With Others', desc: 'Join a community of collectors and investors owning pieces of the same rare assets.' },
+  { icon: Users, title: 'Own Alongside Others', desc: 'Join a community of collectors who each hold direct fractional ownership in the same authenticated assets.' },
 ];
 
 export default async function HomePage() {
@@ -66,9 +66,9 @@ export default async function HomePage() {
             <span className="text-[#C9A84C]">what&apos;s rare</span>
           </h1>
           <p className="text-lg text-[#6A5A40] max-w-2xl mx-auto mb-10 leading-relaxed">
-            Pool your money with other collectors and own fractional shares in
-            authenticated Pokémon boxes, graded sports cards, deadstock sneakers,
-            rare comics, and more.
+            Own your share directly. Buy fractional ownership in authenticated
+            collectibles alongside other collectors — Pokémon boxes, graded sports
+            cards, deadstock sneakers, rare comics, and more.
           </p>
           <div className="flex flex-col sm:flex-row items-center gap-5 justify-center">
             <Link href="/register">
@@ -101,7 +101,7 @@ export default async function HomePage() {
             <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">
               {investorCount.toLocaleString()}
             </div>
-            <div className="text-sm text-[#6A5A40]">Registered Investors</div>
+            <div className="text-sm text-[#6A5A40]">Co-Owners</div>
           </div>
           <div>
             <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">
@@ -199,6 +199,29 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Governance */}
+      <section className="py-20 px-6 border-t border-[#E8E2D6]">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="font-display text-4xl font-bold text-[#1A1207] mb-3">You&apos;re in control</h2>
+            <p className="text-[#6A5A40]">Co-owners vote on the decisions that matter</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {[
+              { title: 'Exit &amp; Pricing', desc: 'Vote on exit timing and reserve price. Your ownership share determines the weight of your vote.' },
+              { title: 'Storage &amp; Insurance', desc: 'Have a direct say in where and how the asset is stored and insured throughout the holding period.' },
+              { title: 'Dispute Resolution', desc: 'Any formal disputes about the asset go to a co-owner vote. Admin cannot override a passed vote.' },
+            ].map((item) => (
+              <div key={item.title} className="bg-white border border-[#E8E2D6] rounded-xl p-6">
+                <div className="h-1 w-8 bg-[#C9A84C] rounded-full mb-4" />
+                <h3 className="text-lg font-semibold text-[#1A1207] mb-2" dangerouslySetInnerHTML={{ __html: item.title }} />
+                <p className="text-[#6A5A40] text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="py-20 px-6 border-t border-[#E8E2D6]">
         <div className="max-w-6xl mx-auto">
@@ -261,8 +284,17 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#E8E2D6] py-8 px-6 text-center text-[#8A7A60] text-sm bg-[#F7F4EE]">
-        © {new Date().getFullYear()} Pooled Wealth. All rights reserved. Collectible asset values can go down as well as up. Past performance is not indicative of future results.
+      <footer className="border-t border-[#E8E2D6] py-8 px-6 bg-[#F7F4EE]">
+        <div className="max-w-6xl mx-auto text-center space-y-3">
+          <div className="flex flex-wrap justify-center gap-4 text-xs text-[#8A7A60]">
+            <Link href="/legal/fsg" className="hover:text-[#1A1207] transition-colors">Financial Services Guide</Link>
+            <Link href="/legal/tmd" className="hover:text-[#1A1207] transition-colors">Target Market Determination</Link>
+            <Link href="/legal/terms" className="hover:text-[#1A1207] transition-colors">Terms &amp; Conditions</Link>
+          </div>
+          <p className="text-xs text-[#8A7A60]">
+            © 2026 Pooled Wealth. All rights reserved. Collectible asset values can go down as well as up. Past performance is not indicative of future results.
+          </p>
+        </div>
       </footer>
     </main>
   );

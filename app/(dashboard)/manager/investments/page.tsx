@@ -82,7 +82,7 @@ export default async function ManagerInvestmentsPage() {
                       </div>
                       <div>
                         <p className="text-[#6A5A40] text-xs flex items-center gap-1 uppercase tracking-widest">
-                          <Users className="h-3 w-3" /> Investors
+                          <Users className="h-3 w-3" /> Co-Owners
                         </p>
                         <p className="text-[#1A1207] font-medium">{inv._count.holdings}</p>
                       </div>

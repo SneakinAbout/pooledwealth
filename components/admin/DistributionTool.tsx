@@ -93,7 +93,7 @@ export default function DistributionTool({
         <CheckCircle className="h-16 w-16 text-[#2E7D32] mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-[#1A1207] mb-2">Distribution Complete</h3>
         <p className="text-[#6A5A40] mb-6">
-          Funds have been distributed to all investors proportionally.
+          Funds have been distributed to all co-owners proportionally.
         </p>
         <Button onClick={() => { setSuccess(false); setPreview(null); }}>
           Process Another Distribution
@@ -155,7 +155,7 @@ export default function DistributionTool({
                 <span className="text-[#1A1207] font-mono-val">{formatCurrency(preview.grossAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#6A5A40]">Investor Cost Basis</span>
+                <span className="text-[#6A5A40]">Co-Owner Cost Basis</span>
                 <span className="text-[#1A1207] font-mono-val">−{formatCurrency(preview.costBasis)}</span>
               </div>
               <div className="flex justify-between border-t border-[#E8E2D6] pt-2">
@@ -169,14 +169,14 @@ export default function DistributionTool({
                 <span className="text-[#C62828] font-mono-val">−{formatCurrency(preview.profitShare)}</span>
               </div>
               <div className="border-t border-[#E8E2D6] pt-2 flex justify-between font-semibold">
-                <span className="text-[#1A1207]">Net to Investors</span>
+                <span className="text-[#1A1207]">Net to Co-Owners</span>
                 <span className="text-[#2E7D32] text-base font-mono-val">
                   {formatCurrency(preview.netAmount)}
                 </span>
               </div>
               <p className="text-xs text-[#8A7A60] pt-1">
                 Management fee ({settings.managementFeePercent}% p.a.) is charged
-                separately on investor balances each month.
+                separately on co-owner balances each month.
               </p>
             </div>
           </div>

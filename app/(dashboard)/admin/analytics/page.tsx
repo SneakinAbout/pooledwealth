@@ -52,7 +52,7 @@ export default async function AdminAnalyticsPage() {
     {
       label: 'Total Users',
       value: totalUsers.toString(),
-      sub: `${totalInvestors} investors`,
+      sub: `${totalInvestors} co-owners`,
       icon: Users,
       color: 'text-[#1565C0]',
       bg: 'bg-[#E3F2FD]',
@@ -134,7 +134,7 @@ export default async function AdminAnalyticsPage() {
         </Card>
 
         <Card>
-          <h2 className="font-semibold text-[#1A1207] mb-4">Top Investments by Investors</h2>
+          <h2 className="font-semibold text-[#1A1207] mb-4">Top Investments by Co-Owners</h2>
           <div className="space-y-3">
             {topInvestments.map((inv) => (
               <div key={inv.id} className="flex items-center justify-between py-2 border-b border-[#E8E2D6] last:border-0">
@@ -144,7 +144,7 @@ export default async function AdminAnalyticsPage() {
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
                   <p className="text-lg font-bold font-mono-val">{inv._count.holdings}</p>
-                  <p className="text-xs text-[#6A5A40]">investors</p>
+                  <p className="text-xs text-[#6A5A40]">co-owners</p>
                 </div>
               </div>
             ))}

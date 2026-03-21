@@ -69,7 +69,7 @@ export default function ProposalList({ investmentId, isAdmin, isOwner }: Props) 
           <p className="text-sm text-[#8A7A60]">No proposals yet.</p>
           {canRaise && (
             <p className="text-xs text-[#8A7A60] mt-1">
-              As a co-owner you can raise proposals for all investors to vote on.
+              As a co-owner you can raise proposals for all co-owners to vote on.
             </p>
           )}
         </div>

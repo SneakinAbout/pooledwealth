@@ -72,7 +72,7 @@ export default async function AdminInvestmentsPage() {
                     </div>
                     <div>
                       <p className="text-[#6A5A40] text-xs flex items-center gap-1">
-                        <Users className="h-3 w-3" /> Investors
+                        <Users className="h-3 w-3" /> Co-Owners
                       </p>
                       <p className="text-[#1A1207] font-medium">{inv._count.holdings}</p>
                     </div>

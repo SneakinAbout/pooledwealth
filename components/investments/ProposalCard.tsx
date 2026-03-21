@@ -228,7 +228,7 @@ export default function ProposalCard({ proposal, investmentId, isAdmin, onUpdate
                 <span className="font-medium text-[#1A1207]">{tally.againstUnits.toLocaleString()} units ({tally.againstPercent.toFixed(1)}%)</span>
               </div>
               <div className="flex justify-between border-t border-[#E8E2D6] pt-1 mt-1">
-                <span className="text-[#6A5A40]">Total investor units</span>
+                <span className="text-[#6A5A40]">Total co-owner units</span>
                 <span className="font-medium text-[#1A1207]">{tally.totalInvestorUnits.toLocaleString()}</span>
               </div>
             </div>

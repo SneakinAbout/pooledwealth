@@ -124,7 +124,7 @@ export default function InvestmentCard({ investment, showStatus = false, isSaved
             <div className="flex justify-between items-center text-[10px] text-[#6A5A40]">
               <span className="flex items-center gap-1">
                 <Users className="h-2.5 w-2.5" />
-                {investment._count?.holdings ?? 0} holders
+                {investment._count?.holdings ?? 0} co-owners
               </span>
               <span>{soldShares.toLocaleString()} / {investment.totalUnits.toLocaleString()} shares sold</span>
             </div>
