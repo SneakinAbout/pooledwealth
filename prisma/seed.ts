@@ -6,11 +6,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting seed...');
 
-  // Clean existing data
+  // Clean existing data (order matters — delete dependents before parents)
   await prisma.distribution.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.holding.deleteMany();
   await prisma.deposit.deleteMany();
+  await prisma.watchlistItem.deleteMany();
+  await prisma.investmentUpdate.deleteMany();
+  await prisma.proposal.deleteMany();
+  await prisma.emailVerifyToken.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.wallet.deleteMany();
   await prisma.platformSettings.deleteMany();
   await prisma.investment.deleteMany();

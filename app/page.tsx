@@ -1,68 +1,37 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { TrendingUp, Shield, Users, ArrowRight, Layers, Lock, Percent, Trophy, Zap } from 'lucide-react';
+import { TrendingUp, Shield, Users, ArrowRight, Layers, Lock, Percent, Package } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import { prisma } from '@/lib/prisma';
+import { formatCurrency } from '@/lib/utils';
+
+export const dynamic = 'force-dynamic';
 
 const features = [
-  {
-    icon: Layers,
-    title: 'Fractional Ownership',
-    desc: 'Buy as little as one share in high-value collectibles previously out of reach.',
-  },
-  {
-    icon: Shield,
-    title: 'Fully Authenticated',
-    desc: 'Every item is professionally graded, authenticated, and held in secure storage.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Track Performance',
-    desc: 'Watch your share value grow as the market for rare collectibles continues to surge.',
-  },
-  {
-    icon: Users,
-    title: 'Pool With Others',
-    desc: 'Join a community of collectors and investors owning pieces of the same rare assets.',
-  },
+  { icon: Layers, title: 'Fractional Ownership', desc: 'Buy as little as one share in high-value collectibles previously out of reach.' },
+  { icon: Shield, title: 'Fully Authenticated', desc: 'Every item is professionally graded, authenticated, and held in secure storage.' },
+  { icon: TrendingUp, title: 'Track Performance', desc: 'Watch your share value grow as the market for rare collectibles continues to surge.' },
+  { icon: Users, title: 'Pool With Others', desc: 'Join a community of collectors and investors owning pieces of the same rare assets.' },
 ];
 
-const drops = [
-  {
-    name: 'Pokémon Base Set Booster Box',
-    tag: '1st Edition · Sealed',
-    category: 'Pokemon TCG',
-    price: '$50 / share',
-    shares: '342 / 500 shares sold',
-    pct: 68,
-    Icon: Layers,
-    iconBg: '#1A2B1F',
-    iconColor: '#C9A84C',
-  },
-  {
-    name: 'Michael Jordan 1986 Fleer RC PSA 10',
-    tag: 'BGS 9.5 · Gem Mint',
-    category: 'Sports Cards',
-    price: '$100 / share',
-    shares: '178 / 200 shares sold',
-    pct: 89,
-    Icon: Trophy,
-    iconBg: '#3D2B00',
-    iconColor: '#C9A84C',
-  },
-  {
-    name: 'Air Jordan 1 Chicago 1985 DS',
-    tag: 'Size 10 · Deadstock',
-    category: 'Sneakers',
-    price: '$25 / share',
-    shares: '610 / 1000 shares sold',
-    pct: 61,
-    Icon: Zap,
-    iconBg: '#1A2B1F',
-    iconColor: '#F7F4EE',
-  },
-];
+export default async function HomePage() {
+  const [featured, stats] = await Promise.all([
+    prisma.investment.findMany({
+      where: { featuredOnHome: true, status: 'ACTIVE' },
+      include: { _count: { select: { holdings: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    }),
+    Promise.all([
+      prisma.holding.aggregate({ _sum: { purchasePrice: true } }),
+      prisma.user.count({ where: { role: 'INVESTOR' } }),
+      prisma.investment.count({ where: { status: 'ACTIVE' } }),
+    ]),
+  ]);
 
-export default function HomePage() {
+  const [aumResult, investorCount, activeAssets] = stats;
+  const totalAUM = Number(aumResult._sum.purchasePrice ?? 0);
+
   return (
     <main className="min-h-screen bg-[#F7F4EE] overflow-x-hidden">
       {/* Nav */}
@@ -88,20 +57,20 @@ export default function HomePage() {
       {/* Hero */}
       <section className="pt-40 pb-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="animate-fade-up inline-flex items-center gap-2 bg-[#1A2B1F]/8 border border-[#1A2B1F]/15 rounded-full px-4 py-1.5 mb-8" style={{ animationDelay: '0ms' }}>
+          <div className="inline-flex items-center gap-2 bg-[#1A2B1F]/8 border border-[#1A2B1F]/15 rounded-full px-4 py-1.5 mb-8">
             <Lock className="h-3.5 w-3.5 text-[#C9A84C]" />
             <span className="text-[#6A5A40] text-sm font-medium">Authenticated collectibles, fractional ownership</span>
           </div>
-          <h1 className="animate-fade-up font-display text-6xl md:text-8xl font-bold text-[#1A1207] leading-[1.0] tracking-tight mb-6" style={{ animationDelay: '100ms' }}>
+          <h1 className="font-display text-6xl md:text-8xl font-bold text-[#1A1207] leading-[1.0] tracking-tight mb-6">
             Own a piece of{' '}
             <span className="text-[#C9A84C]">what&apos;s rare</span>
           </h1>
-          <p className="animate-fade-up text-lg text-[#6A5A40] max-w-2xl mx-auto mb-10 leading-relaxed" style={{ animationDelay: '250ms' }}>
+          <p className="text-lg text-[#6A5A40] max-w-2xl mx-auto mb-10 leading-relaxed">
             Pool your money with other collectors and own fractional shares in
             authenticated Pokémon boxes, graded sports cards, deadstock sneakers,
             rare comics, and more.
           </p>
-          <div className="animate-fade-up flex flex-col sm:flex-row items-center gap-5 justify-center" style={{ animationDelay: '400ms' }}>
+          <div className="flex flex-col sm:flex-row items-center gap-5 justify-center">
             <Link href="/register">
               <Button size="lg">
                 Browse Assets
@@ -117,22 +86,33 @@ export default function HomePage() {
 
       {/* Stats */}
       <section className="py-12 px-6 border-y border-[#E8E2D6] bg-white">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {[
-            { value: '$4.2M+', label: 'Assets Under Management' },
-            { value: '3,800+', label: 'Active Shareholders' },
-            { value: '95+', label: 'Authenticated Assets' },
-            { value: '34%', label: 'Avg. 3yr Appreciation' },
-          ].map((s) => (
-            <div key={s.label}>
-              <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">{s.value}</div>
-              <div className="text-sm text-[#6A5A40]">{s.label}</div>
+        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-3 gap-8 text-center">
+          <div>
+            <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">
+              {totalAUM >= 1_000_000
+                ? `$${(totalAUM / 1_000_000).toFixed(1)}M`
+                : totalAUM >= 1_000
+                ? `$${(totalAUM / 1_000).toFixed(0)}K`
+                : formatCurrency(totalAUM)}
             </div>
-          ))}
+            <div className="text-sm text-[#6A5A40]">Assets Under Management</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">
+              {investorCount.toLocaleString()}
+            </div>
+            <div className="text-sm text-[#6A5A40]">Registered Investors</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold font-mono-val text-[#C9A84C] mb-1">
+              {activeAssets}
+            </div>
+            <div className="text-sm text-[#6A5A40]">Active Assets</div>
+          </div>
         </div>
       </section>
 
-      {/* Featured Drops */}
+      {/* Featured Assets */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-10">
@@ -140,46 +120,59 @@ export default function HomePage() {
               <h2 className="font-display text-3xl font-bold text-[#1A1207]">Featured Assets</h2>
               <p className="text-[#6A5A40] mt-1">Currently open for investment</p>
             </div>
-            <Link href="/register">
+            <Link href="/investments">
               <Button variant="secondary" size="sm">View All →</Button>
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {drops.map((drop) => {
-              const DropIcon = drop.Icon;
-              return (
-              <div
-                key={drop.name}
-                className="bg-white border border-[#E8E2D6] rounded-2xl overflow-hidden hover:border-[#C9A84C]/50 hover:-translate-y-0.5 transition-all duration-200"
-              >
-                <div className="h-44 border-b border-[#E8E2D6] flex items-center justify-center" style={{ background: drop.iconBg }}>
-                  <DropIcon style={{ color: drop.iconColor }} className="h-16 w-16 opacity-80" />
-                </div>
-                <div className="p-5 space-y-3">
-                  <div>
-                    <span className="text-xs font-semibold text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-md uppercase tracking-wide">
-                      {drop.category}
-                    </span>
-                    <h3 className="mt-2 font-semibold text-[#1A1207] leading-tight text-sm">{drop.name}</h3>
-                    <p className="text-xs text-[#8A7A60] mt-0.5">{drop.tag}</p>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#C9A84C] font-bold font-mono-val">{drop.price}</span>
-                    <span className="text-[#6A5A40]">{drop.pct}% sold</span>
-                  </div>
-                  <div className="w-full bg-[#EDE6D6] rounded-full h-1.5">
-                    <div
-                      className="h-full rounded-full bg-[#C9A84C]"
-                      style={{ width: `${drop.pct}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-[#8A7A60]">{drop.shares}</p>
-                </div>
-              </div>
-              );
-            })}
-          </div>
+          {featured.length === 0 ? (
+            <div className="text-center py-16 text-[#8A7A60] text-sm border border-dashed border-[#E8E2D6] rounded-2xl">
+              No featured assets yet — admins can mark assets as featured from the investment management page.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {featured.map((inv) => {
+                const soldShares = inv.totalUnits - inv.availableUnits;
+                const pct = Math.round((soldShares / inv.totalUnits) * 100);
+                return (
+                  <Link key={inv.id} href="/investments">
+                    <div className="bg-white border border-[#E8E2D6] rounded-2xl overflow-hidden hover:border-[#C9A84C]/50 hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col">
+                      <div className="relative h-44 bg-[#EDE6D6] overflow-hidden flex-shrink-0">
+                        {inv.imageUrl ? (
+                          <Image src={inv.imageUrl} alt={inv.title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <Package className="h-12 w-12 text-[#C9A84C]/30" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#1A2B1F]/40 via-transparent to-transparent" />
+                        <div className="absolute top-3 left-3">
+                          <span className="bg-[#1A2B1F] text-[#C9A84C] text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wide">
+                            {inv.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-5 space-y-3 flex flex-col flex-1">
+                        <h3 className="font-semibold text-[#1A1207] leading-tight text-sm line-clamp-2">{inv.title}</h3>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-[#C9A84C] font-bold font-mono-val">{formatCurrency(Number(inv.pricePerUnit))} / share</span>
+                          <span className="text-[#6A5A40]">{pct}% sold</span>
+                        </div>
+                        <div className="w-full bg-[#EDE6D6] rounded-full h-1.5">
+                          <div className="h-full rounded-full bg-[#C9A84C]" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-[#8A7A60]">{soldShares.toLocaleString()} / {inv.totalUnits.toLocaleString()} shares sold</p>
+                        <div className="mt-auto pt-2 border-t border-[#E8E2D6] flex items-center justify-between text-xs text-[#1A2B1F] font-medium">
+                          <span>View details</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -217,10 +210,7 @@ export default function HomePage() {
             {features.map((f) => {
               const Icon = f.icon;
               return (
-                <div
-                  key={f.title}
-                  className="bg-white border border-[#E8E2D6] rounded-xl p-6 hover:border-[#C9A84C]/40 transition-colors"
-                >
+                <div key={f.title} className="bg-white border border-[#E8E2D6] rounded-xl p-6 hover:border-[#C9A84C]/40 transition-colors">
                   <div className="h-10 w-10 rounded-lg bg-[#1A2B1F] flex items-center justify-center mb-4">
                     <Icon className="h-5 w-5 text-[#C9A84C]" />
                   </div>
@@ -260,12 +250,8 @@ export default function HomePage() {
       <section className="py-24 px-6">
         <div className="max-w-2xl mx-auto text-center bg-white border border-[#E8E2D6] rounded-3xl p-12">
           <div className="text-5xl mb-5">🎴</div>
-          <h2 className="font-display text-4xl font-bold text-[#1A1207] mb-4 tracking-tight">
-            Ready to own a piece?
-          </h2>
-          <p className="text-[#6A5A40] mb-8 leading-relaxed">
-            Create a free account and start browsing authenticated assets today.
-          </p>
+          <h2 className="font-display text-4xl font-bold text-[#1A1207] mb-4 tracking-tight">Ready to own a piece?</h2>
+          <p className="text-[#6A5A40] mb-8 leading-relaxed">Create a free account and start browsing authenticated assets today.</p>
           <Link href="/register">
             <Button size="lg">
               Create Free Account
@@ -276,7 +262,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-[#E8E2D6] py-8 px-6 text-center text-[#8A7A60] text-sm bg-[#F7F4EE]">
-        © 2024 Pooled Wealth. All rights reserved. Collectible asset values can go down as well as up. Past performance is not indicative of future results.
+        © {new Date().getFullYear()} Pooled Wealth. All rights reserved. Collectible asset values can go down as well as up. Past performance is not indicative of future results.
       </footer>
     </main>
   );

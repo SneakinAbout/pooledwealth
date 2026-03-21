@@ -156,6 +156,7 @@ model Investment {
   endDate        DateTime
   imageUrl       String?
   locked         Boolean          @default(false)
+  featuredOnHome Boolean          @default(false)
   reservePrice   Decimal?         @db.Decimal(18, 2)
   currentValue   Decimal?         @db.Decimal(18, 2) // admin/manager updated valuation
 

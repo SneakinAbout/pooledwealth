@@ -9,7 +9,8 @@ import Button from '@/components/ui/Button';
 import ProgressBar from '@/components/ui/ProgressBar';
 import AdminInvestmentActions from './AdminInvestmentActions';
 import { formatCurrency, formatDate, calculateProgress } from '@/lib/utils';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Star } from 'lucide-react';
+import FeaturedToggle from './FeaturedToggle';
 
 export default async function AdminInvestmentsPage() {
   const session = await getServerSession(authOptions);
@@ -82,6 +83,7 @@ export default async function AdminInvestmentsPage() {
                 </div>
 
                 <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                  <FeaturedToggle investmentId={inv.id} initialFeatured={inv.featuredOnHome} />
                   <Link href={`/investments/${inv.id}`}>
                     <Button variant="ghost" size="sm">View</Button>
                   </Link>
