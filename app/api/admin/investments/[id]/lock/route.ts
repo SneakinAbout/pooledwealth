@@ -1,0 +1,25 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+
+// POST /api/admin/investments/[id]/lock  — toggles locked state
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const investment = await prisma.investment.findUnique({ where: { id: params.id } });
+  if (!investment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const updated = await prisma.investment.update({
+    where: { id: params.id },
+    data: { locked: !investment.locked },
+  });
+
+  return NextResponse.json({ locked: updated.locked });
+}

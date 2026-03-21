@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  INVESTOR
+}
+
+enum InvestmentStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum TransactionType {
+  PURCHASE
+  REDEMPTION
+  FEE
+  DISTRIBUTION
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum ProposalType {
+  EXIT
+  RESERVE_PRICE
+  STORAGE_INSURANCE
+  DISPUTE
+}
+
+enum ProposalStatus {
+  DRAFT
+  OPEN
+  PASSED
+  FAILED
+  INVALID
+  IMPLEMENTED
+}
+
+enum VoteChoice {
+  FOR
+  AGAINST
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  password    String
+  role               Role    @default(INVESTOR)
+  kycApproved        Boolean @default(false)
+  feeDiscountPercent Decimal @default(0) @db.Decimal(5, 2)
+
+  // Profile
+  phone          String?
+  dateOfBirth    DateTime?
+  taxFileNumber  String?   // Australian TFN (stored; display masked)
+  streetAddress  String?
+  suburb         String?
+  state          String?   // AU state/territory: NSW, VIC, QLD, SA, WA, TAS, NT, ACT
+  postcode       String?
+
+  // Bank account (for withdrawals)
+  bankAccountName   String?
+  bankBsb           String?
+  bankAccountNumber String?
+
+  // Manager profile
+  bio               String?   @db.Text
+  linkedinUrl       String?
+
+  // Auth & verification
+  termsAcceptedAt       DateTime?
+  emailVerified         Boolean   @default(false)
+  emailVerifiedAt       DateTime?
+
+  createdAt          DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  investments           Investment[]
+  holdings              Holding[]
+  transactions          Transaction[]
+  settings              PlatformSettings[]
+  wallet                Wallet?
+  auditLogs             AuditLog[]
+  proposalsRaised       Proposal[]              @relation("ProposalsRaised")
+  votes                 Vote[]                  @relation("VotesCast")
+  withdrawals           Withdrawal[]
+  watchlist             WatchlistItem[]
+  kycDocuments          KycDocument[]
+  passwordResetTokens   PasswordResetToken[]
+  emailVerifyTokens     EmailVerifyToken[]
+  investmentUpdates     InvestmentUpdate[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Decimal  @default(0) @db.Decimal(18, 2)
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  deposits Deposit[]
+
+  @@map("wallets")
+}
+
+model Deposit {
+  id                    String            @id @default(cuid())
+  walletId              String
+  amount                Decimal           @db.Decimal(18, 2)
+  status                TransactionStatus @default(PENDING)
+  // "STRIPE" for card deposits; "BANK_TRANSFER" for manual bank transfer deposits
+  type                  String            @default("STRIPE")
+  stripePaymentIntentId String?           @unique
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([status])
+  @@index([type])
+  @@map("deposits")
+}
+
+model Investment {
+  id             String           @id @default(cuid())
+  title          String
+  description    String           @db.Text
+  category       String
+  status         InvestmentStatus @default(DRAFT)
+  totalUnits     Int
+  availableUnits Int
+  pricePerUnit   Decimal          @db.Decimal(18, 2)
+  minimumUnits   Int              @default(1)
+  minimumRaise   Int              @default(0) // min units sold before investment can proceed; 0 = no minimum
+  targetReturn   Decimal          @db.Decimal(5, 2)
+  startDate      DateTime
+  endDate        DateTime
+  imageUrl       String?
+  locked         Boolean          @default(false)
+  reservePrice   Decimal?         @db.Decimal(18, 2)
+  currentValue   Decimal?         @db.Decimal(18, 2) // admin/manager updated valuation
+
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  holdings      Holding[]
+  transactions  Transaction[]
+  distributions Distribution[]
+  proposals     Proposal[]
+  updates       InvestmentUpdate[]
+  watchlistItems WatchlistItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("investments")
+}
+
+model Holding {
+  id             String   @id @default(cuid())
+  userId         String
+  investmentId   String
+  unitsPurchased Int
+  // purchasePrice is a CUMULATIVE cost basis (total dollars spent across all
+  // purchases of this investment by this user), NOT a per-unit or per-purchase
+  // price snapshot. It is incremented on each subsequent purchase.
+  purchasePrice  Decimal  @db.Decimal(18, 2)
+  purchasedAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@index([userId])
+  @@index([investmentId])
+  @@map("holdings")
+}
+
+model Transaction {
+  id           String            @id @default(cuid())
+  userId       String
+  investmentId String?
+  type         TransactionType
+  units        Int?
+  amount       Decimal           @db.Decimal(18, 2)
+  status       TransactionStatus @default(PENDING)
+  stripePaymentIntentId String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  investment Investment? @relation(fields: [investmentId], references: [id])
+
+  @@index([userId])
+  @@index([investmentId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("transactions")
+}
+
+model PlatformSettings {
+  id                   String  @id @default(cuid())
+  managementFeePercent Decimal @db.Decimal(5, 2)
+  profitSharePercent   Decimal @db.Decimal(5, 2)
+
+  // Bank details
+  bankName          String @default("First National Bank")
+  bankAccountName   String @default("Pooled Wealth Pty Ltd")
+  bankBSB           String @default("062-000")
+  bankAccountNumber String @default("1234 5678")
+  bankSwift         String @default("CTBAAU2S")
+
+  // Platform
+  platformName     String @default("Pooled Wealth")
+  supportEmail     String @default("support@pooledwealth.com")
+  minDepositAmount Int    @default(10)
+  maxDepositAmount Int    @default(100000)
+
+  updatedById String
+  updatedBy   User     @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime @default(now())
+
+  @@map("platform_settings")
+}
+
+model Distribution {
+  id                  String   @id @default(cuid())
+  investmentId        String
+  totalAmount         Decimal  @db.Decimal(18, 2)
+  feeDeducted         Decimal  @db.Decimal(18, 2)
+  profitShareDeducted Decimal  @db.Decimal(18, 2)
+  netAmount           Decimal  @db.Decimal(18, 2)
+  distributedAt       DateTime @default(now())
+  notes               String?  @db.Text
+
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@map("distributions")
+}
+
+model Proposal {
+  id                    String         @id @default(cuid())
+  investmentId          String
+  raisedById            String
+  type                  ProposalType
+  status                ProposalStatus @default(DRAFT)
+  proposedValue         String?        // JSON string for flexible values (price, insurance details, etc.)
+  description           String         @db.Text
+  adminRejectionReason  String?        @db.Text
+  earlyCloseTriggered   Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  opensAt               DateTime?
+  closesAt              DateTime?
+  implementedAt         DateTime?
+
+  investment Investment @relation(fields: [investmentId], references: [id])
+  raisedBy   User       @relation("ProposalsRaised", fields: [raisedById], references: [id])
+  votes      Vote[]
+
+  @@index([investmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("proposals")
+}
+
+model Vote {
+  id               String     @id @default(cuid())
+  proposalId       String
+  userId           String
+  choice           VoteChoice
+  sharesAtVoteTime Int
+  votedAt          DateTime   @default(now())
+  lastChangedAt    DateTime   @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id])
+  user     User     @relation("VotesCast", fields: [userId], references: [id])
+
+  @@unique([proposalId, userId])
+  @@index([proposalId])
+  @@map("votes")
+}
+
+model Withdrawal {
+  id                String            @id @default(cuid())
+  userId            String
+  amount            Decimal           @db.Decimal(18, 2)
+  status            TransactionStatus @default(PENDING)
+  bankAccountName   String
+  bankBsb           String
+  bankAccountNumber String
+  note              String?
+  processedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("withdrawals")
+}
+
+model InvestmentUpdate {
+  id           String   @id @default(cuid())
+  investmentId String
+  createdById  String
+  title        String
+  body         String   @db.Text
+  createdAt    DateTime @default(now())
+
+  investment Investment @relation(fields: [investmentId], references: [id])
+  createdBy  User       @relation(fields: [createdById], references: [id])
+
+  @@index([investmentId])
+  @@index([createdAt])
+  @@map("investment_updates")
+}
+
+model WatchlistItem {
+  id           String   @id @default(cuid())
+  userId       String
+  investmentId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@unique([userId, investmentId])
+  @@index([userId])
+  @@map("watchlist_items")
+}
+
+model KycDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String   // e.g. "PASSPORT", "DRIVERS_LICENCE", "PROOF_OF_ADDRESS"
+  fileName   String
+  fileData   Bytes    // stored as binary in DB (small files only)
+  mimeType   String
+  uploadedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("kyc_documents")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerifyToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
+  @@map("email_verify_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  target    String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
