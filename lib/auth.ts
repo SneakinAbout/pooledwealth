@@ -64,8 +64,8 @@ export const authOptions: NextAuthOptions = {
           select: { role: true, kycApproved: true },
         });
         if (!dbUser) {
-          // User was deleted — return an empty token to invalidate the session
-          return {};
+          // User was deleted — clear identity fields to invalidate the session
+          return { ...token, id: '', role: undefined, kycApproved: undefined };
         }
         token.role = dbUser.role;
         token.kycApproved = dbUser.kycApproved;
