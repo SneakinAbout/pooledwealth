@@ -127,7 +127,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const groups = navGroups[role] ?? navGroups.INVESTOR;
 
   const [balance, setBalance] = useState<number | null>(null);
-  const [pendingDeposits, setPendingDeposits] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
 
@@ -140,12 +140,10 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const fetchPendingDeposits = () => {
     if (role !== 'ADMIN') return;
-    fetch('/api/admin/deposits')
+    fetch('/api/admin/pending-count')
       .then((r) => r.json())
-      .then((d: Array<{ status: string }>) => {
-        if (Array.isArray(d)) {
-          setPendingDeposits(d.filter((dep) => dep.status === 'PENDING').length);
-        }
+      .then((d: { total: number }) => {
+        if (typeof d.total === 'number') setPendingCount(d.total);
       })
       .catch(() => {});
   };
@@ -224,7 +222,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             {group.items.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
-              const showBadge = (item.href === '/admin/deposits' || item.href === '/admin') && pendingDeposits > 0;
+              const showBadge = item.href === '/admin' && pendingCount > 0;
 
               return (
                 <Link
@@ -242,7 +240,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   <span className="flex-1 truncate">{item.label}</span>
                   {showBadge && (
                     <span className="h-4 min-w-[1rem] px-1 rounded-full bg-[#C9A84C] text-[10px] font-bold text-[#1A2B1F] flex items-center justify-center">
-                      {pendingDeposits}
+                      {pendingCount}
                     </span>
                   )}
                 </Link>
