@@ -145,7 +145,7 @@ export default function InvestmentForm({ initial, mode }: InvestmentFormProps) {
         />
 
         <Input
-          label="Price per Share (USD)"
+          label="Price per Share (AUD)"
           type="number"
           min={0.01}
           step={0.01}

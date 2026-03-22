@@ -373,7 +373,7 @@ export default function InvestmentAdminSection({
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Input
-                    label="Gross Distribution Amount (USD)"
+                    label="Gross Distribution Amount (AUD)"
                     type="number"
                     step="0.01"
                     min="0"

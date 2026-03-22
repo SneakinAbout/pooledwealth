@@ -247,14 +247,14 @@ function PlatformTab({ current }: { current: CurrentSettings }) {
           {...register('supportEmail')}
         />
         <Input
-          label="Minimum Deposit (USD)"
+          label="Minimum Deposit (AUD)"
           type="number"
           hint="Smallest amount a user can deposit"
           error={errors.minDepositAmount?.message}
           {...register('minDepositAmount', { valueAsNumber: true })}
         />
         <Input
-          label="Maximum Deposit (USD)"
+          label="Maximum Deposit (AUD)"
           type="number"
           hint="Largest amount a user can deposit at once"
           error={errors.maxDepositAmount?.message}

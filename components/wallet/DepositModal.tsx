@@ -230,7 +230,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
           </div>
 
           <Input
-            label="Custom Amount (USD)"
+            label="Custom Amount (AUD)"
             type="number"
             min={10}
             max={100000}
