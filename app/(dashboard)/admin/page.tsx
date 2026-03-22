@@ -93,6 +93,7 @@ export default async function AdminDashboardPage() {
         createdAt: d.createdAt.toISOString(),
         userName: d.wallet.user.name,
         userEmail: d.wallet.user.email,
+        reference: d.stripePaymentIntentId ?? '',
       }))}
       draftProposals={draftProposals.map((p) => ({
         id: p.id,
@@ -126,6 +127,7 @@ export default async function AdminDashboardPage() {
         bankBsb: w.bankBsb,
         bankAccountNumber: w.bankAccountNumber,
         createdAt: w.createdAt.toISOString(),
+        downloadedAt: w.downloadedAt?.toISOString() ?? null,
         userName: w.user.name,
         userEmail: w.user.email,
         userId: w.user.id,

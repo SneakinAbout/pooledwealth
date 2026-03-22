@@ -21,6 +21,7 @@ import {
   Activity,
   Sparkles,
   ArrowDownLeft,
+  Download,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -45,6 +46,7 @@ interface PendingDeposit {
   createdAt: string;
   userName: string;
   userEmail: string;
+  reference: string;
 }
 
 interface DraftProposal {
@@ -82,6 +84,7 @@ interface PendingWithdrawal {
   bankBsb: string;
   bankAccountNumber: string;
   createdAt: string;
+  downloadedAt: string | null;
   userName: string;
   userEmail: string;
   userId: string;
@@ -164,6 +167,7 @@ export default function AdminDashboardClient({
   const [kycUsers, setKycUsers] = useState(initialKyc);
   const [withdrawals, setWithdrawals] = useState(initialWithdrawals);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
   const [rejectProposalId, setRejectProposalId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -268,6 +272,34 @@ export default function AdminDashboardClient({
     }
   }
 
+  // ── Download CSV ─────────────────────────────────────────────────────────
+
+  async function handleDownloadCsv() {
+    setDownloadingCsv(true);
+    try {
+      const res = await fetch('/api/admin/withdrawals/download', { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json();
+        toast.error(d.error ?? 'Download failed');
+        return;
+      }
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `withdrawals-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      // Mark all not-yet-downloaded rows as downloaded in local state
+      const now = new Date().toISOString();
+      setWithdrawals((prev) => prev.map((w) => ({ ...w, downloadedAt: w.downloadedAt ?? now })));
+      toast.success('CSV downloaded — rows marked as sent to bank');
+    } finally {
+      setDownloadingCsv(false);
+    }
+  }
+
   // ── Withdrawal actions ───────────────────────────────────────────────────
 
   async function handleWithdrawal(id: string, action: 'approve' | 'reject') {
@@ -369,6 +401,7 @@ export default function AdminDashboardClient({
                 const active = activeTab === tab.key;
                 const shortLabel: Record<string, string> = {
                   deposits: 'Deposits',
+                  withdrawals: 'Withdrawals',
                   proposals: 'Proposals',
                   passed: 'Implement',
                   kyc: 'KYC',
@@ -413,6 +446,12 @@ export default function AdminDashboardClient({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-[#1A1207] truncate">{dep.userName}</p>
                         <p className="text-xs text-[#8A7A60] truncate">{dep.userEmail}</p>
+                        {dep.reference && (
+                          <p className="text-[10px] mt-0.5">
+                            <span className="text-[#8A7A60]">Ref: </span>
+                            <code className="font-mono text-[#1A1207] bg-[#EDE6D6] px-1 rounded">{dep.reference}</code>
+                          </p>
+                        )}
                         <p className="text-[10px] text-[#8A7A60] mt-0.5">{formatDate(dep.createdAt)}</p>
                       </div>
                       <div className="text-right flex-shrink-0 mr-3">
@@ -588,44 +627,82 @@ export default function AdminDashboardClient({
                 withdrawals.length === 0 ? (
                   <EmptyState icon={ArrowDownLeft} message="No pending withdrawal requests" />
                 ) : (
-                  withdrawals.map((w) => (
-                    <div key={w.id} className="p-4 flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                        <ArrowDownLeft className="h-4 w-4 text-red-600" />
+                  <>
+                    {/* Bulk download bar */}
+                    <div className="px-4 py-3 bg-[#F7F4EE] border-b border-[#E8E2D6] flex items-center justify-between gap-3">
+                      <div className="text-xs text-[#6A5A40]">
+                        <span className="font-medium text-[#1A1207]">{withdrawals.filter((w) => !w.downloadedAt).length}</span> not yet sent to bank
+                        {' · '}
+                        <span className="font-medium text-[#2E7D32]">{withdrawals.filter((w) => w.downloadedAt).length}</span> already downloaded
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-[#1A1207]">{formatCurrency(w.amount)}</p>
-                          <Link href={`/admin/users/${w.userId}`} className="text-xs text-[#1565C0] hover:underline truncate">
-                            {w.userName}
-                          </Link>
-                        </div>
-                        <p className="text-xs text-[#8A7A60] truncate">{w.bankAccountName} · BSB {w.bankBsb} · {w.bankAccountNumber}</p>
-                        <p className="text-[10px] text-[#8A7A60] mt-0.5">Requested {formatDate(w.createdAt)}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          onClick={() => handleWithdrawal(w.id, 'approve')}
-                          disabled={loadingId === w.id}
-                          className="flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="h-3 w-3" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleWithdrawal(w.id, 'reject')}
-                          disabled={loadingId === w.id}
-                          className="flex items-center gap-1"
-                        >
-                          <XCircle className="h-3 w-3" />
-                          Reject
-                        </Button>
-                      </div>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={handleDownloadCsv}
+                        disabled={downloadingCsv || withdrawals.every((w) => w.downloadedAt)}
+                        className="flex items-center gap-1.5 flex-shrink-0"
+                      >
+                        <Download className="h-3 w-3" />
+                        {downloadingCsv ? 'Downloading…' : 'Download CSV'}
+                      </Button>
                     </div>
-                  ))
+
+                    {withdrawals.map((w) => (
+                      <div key={w.id} className="p-4 flex items-start gap-4">
+                        <div className="h-9 w-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <ArrowDownLeft className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-[#1A1207]">{formatCurrency(w.amount)}</p>
+                            <Link href={`/admin/users/${w.userId}`} className="text-xs text-[#1565C0] hover:underline truncate">
+                              {w.userName}
+                            </Link>
+                            {/* Download status badge */}
+                            {w.downloadedAt ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F5E9] text-[#2E7D32]">
+                                <CheckCircle2 className="h-2.5 w-2.5" />
+                                Sent to bank
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700">
+                                <Download className="h-2.5 w-2.5" />
+                                Not downloaded
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#8A7A60] truncate mt-0.5">{w.bankAccountName} · BSB {w.bankBsb} · {w.bankAccountNumber}</p>
+                          <p className="text-[10px] text-[#8A7A60] mt-0.5">
+                            Requested {formatDate(w.createdAt)}
+                            {w.downloadedAt && (
+                              <> · Downloaded {formatDate(w.downloadedAt)}</>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => handleWithdrawal(w.id, 'approve')}
+                            disabled={loadingId === w.id}
+                            className="flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleWithdrawal(w.id, 'reject')}
+                            disabled={loadingId === w.id}
+                            className="flex items-center gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
                 )
               )}
 

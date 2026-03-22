@@ -321,6 +321,7 @@ model Withdrawal {
   bankAccountNumber String
   note              String?
   processedAt       DateTime?
+  downloadedAt      DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
