@@ -18,7 +18,7 @@ export async function createPaymentIntent(
 ) {
   return stripe.paymentIntents.create({
     amount: Math.round(amount * 100), // convert to cents
-    currency: 'usd',
+    currency: 'aud',
     automatic_payment_methods: { enabled: true },
     metadata,
   });

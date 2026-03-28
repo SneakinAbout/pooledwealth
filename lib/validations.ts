@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Invalid email address').max(254),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
 });
 
 export const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email address').max(254),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
   confirmPassword: z.string(),
   termsAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms and conditions' }) }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -18,8 +18,8 @@ export const registerSchema = z.object({
 
 // Base object — use this when you need .partial() (e.g. PATCH/PUT updates)
 export const investmentSchemaBase = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
+  title: z.string().min(3, 'Title must be at least 3 characters').max(200),
+  description: z.string().min(20, 'Description must be at least 20 characters').max(5000),
   category: z.enum(['Pokemon TCG', 'Sports Cards', 'Sneakers', 'Comics', 'Watches', 'Memorabilia']),
   status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED', 'ARCHIVED']).optional(),
   totalUnits: z.number().int().positive('Total units must be positive'),
@@ -29,12 +29,12 @@ export const investmentSchemaBase = z.object({
   targetReturn: z.number().min(0).max(100, 'Target return must be between 0 and 100'),
   startDate: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid start date'),
   endDate: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid end date'),
-  imageUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+  imageUrl: z.string().url('Invalid URL').max(2000).optional().or(z.literal('')),
   // Asset identification fields for supplement documents
-  edition: z.string().optional().or(z.literal('')),
-  grade: z.string().optional().or(z.literal('')),
-  gradingCompany: z.string().optional().or(z.literal('')),
-  certNumber: z.string().optional().or(z.literal('')),
+  edition: z.string().max(200).optional().or(z.literal('')),
+  grade: z.string().max(200).optional().or(z.literal('')),
+  gradingCompany: z.string().max(200).optional().or(z.literal('')),
+  certNumber: z.string().max(200).optional().or(z.literal('')),
   acquisitionPrice: z.number().positive('Acquisition price must be positive').optional(),
   acquisitionDate: z.string().refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid acquisition date').optional().or(z.literal('')),
 });
@@ -65,20 +65,20 @@ export const feeSettingsSchema = z.object({
 export const distributionSchema = z.object({
   investmentId: z.string().cuid('Invalid investment ID'),
   totalAmount: z.number().positive('Amount must be positive'),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 export const bankSettingsSchema = z.object({
-  bankName: z.string().min(1, 'Required'),
-  bankAccountName: z.string().min(1, 'Required'),
-  bankBSB: z.string().min(1, 'Required'),
-  bankAccountNumber: z.string().min(1, 'Required'),
-  bankSwift: z.string().min(1, 'Required'),
+  bankName: z.string().min(1, 'Required').max(100),
+  bankAccountName: z.string().min(1, 'Required').max(100),
+  bankBSB: z.string().min(1, 'Required').max(10),
+  bankAccountNumber: z.string().min(1, 'Required').max(30),
+  bankSwift: z.string().min(1, 'Required').max(11),
 });
 
 export const platformSettingsSchema = z.object({
-  platformName: z.string().min(1, 'Required'),
-  supportEmail: z.string().email('Invalid email'),
+  platformName: z.string().min(1, 'Required').max(100),
+  supportEmail: z.string().email('Invalid email').max(254),
   minDepositAmount: z.number().int().min(1).max(10000),
   maxDepositAmount: z.number().int().min(100).max(10000000),
 });

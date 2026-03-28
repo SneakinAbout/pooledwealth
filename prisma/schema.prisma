@@ -118,7 +118,7 @@ model Wallet {
   balance   Decimal  @default(0) @db.Decimal(18, 2)
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   deposits Deposit[]
 
   @@map("wallets")
@@ -135,7 +135,7 @@ model Deposit {
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
-  wallet Wallet @relation(fields: [walletId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
 
   @@index([status])
   @@index([type])
@@ -171,7 +171,7 @@ model Investment {
   acquisitionDate  DateTime?
 
   createdById String
-  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdBy   User             @relation(fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -185,6 +185,7 @@ model Investment {
 
   @@index([status])
   @@index([createdAt])
+  @@index([createdById])
   @@map("investments")
 }
 
@@ -199,8 +200,8 @@ model Holding {
   purchasePrice  Decimal  @db.Decimal(18, 2)
   purchasedAt    DateTime @default(now())
 
-  user       User       @relation(fields: [userId], references: [id])
-  investment Investment @relation(fields: [investmentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([investmentId])
@@ -219,8 +220,8 @@ model Transaction {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id])
-  investment Investment? @relation(fields: [investmentId], references: [id])
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  investment Investment? @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([investmentId])
@@ -247,8 +248,8 @@ model PlatformSettings {
   minDepositAmount Int    @default(10)
   maxDepositAmount Int    @default(100000)
 
-  updatedById String
-  updatedBy   User     @relation(fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime @default(now())
 
   @@map("platform_settings")
@@ -264,7 +265,7 @@ model Distribution {
   distributedAt       DateTime @default(now())
   notes               String?  @db.Text
 
-  investment Investment @relation(fields: [investmentId], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
   @@map("distributions")
 }
@@ -284,8 +285,8 @@ model Proposal {
   closesAt              DateTime?
   implementedAt         DateTime?
 
-  investment Investment @relation(fields: [investmentId], references: [id])
-  raisedBy   User       @relation("ProposalsRaised", fields: [raisedById], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+  raisedBy   User       @relation("ProposalsRaised", fields: [raisedById], references: [id], onDelete: Restrict)
   votes      Vote[]
 
   @@index([investmentId])
@@ -303,8 +304,8 @@ model Vote {
   votedAt          DateTime   @default(now())
   lastChangedAt    DateTime   @default(now())
 
-  proposal Proposal @relation(fields: [proposalId], references: [id])
-  user     User     @relation("VotesCast", fields: [userId], references: [id])
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user     User     @relation("VotesCast", fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([proposalId, userId])
   @@index([proposalId])
@@ -325,7 +326,7 @@ model Withdrawal {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([status])
@@ -341,8 +342,8 @@ model InvestmentUpdate {
   body         String   @db.Text
   createdAt    DateTime @default(now())
 
-  investment Investment @relation(fields: [investmentId], references: [id])
-  createdBy  User       @relation(fields: [createdById], references: [id])
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  createdBy  User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([investmentId])
   @@index([createdAt])
@@ -355,8 +356,8 @@ model WatchlistItem {
   investmentId String
   createdAt    DateTime @default(now())
 
-  user       User       @relation(fields: [userId], references: [id])
-  investment Investment @relation(fields: [investmentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, investmentId])
   @@index([userId])
@@ -372,7 +373,7 @@ model KycDocument {
   mimeType   String
   uploadedAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("kyc_documents")
@@ -386,7 +387,7 @@ model PasswordResetToken {
   usedAt    DateTime?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])
@@ -401,7 +402,7 @@ model EmailVerifyToken {
   usedAt    DateTime?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])
@@ -416,7 +417,7 @@ model AuditLog {
   details   Json?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -439,11 +440,12 @@ model AssetSupplement {
   finalisedAt            DateTime?
   finalOwnershipRegister Json?
 
-  user       User       @relation(fields: [userId], references: [id])
-  investment Investment @relation(fields: [investmentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([investmentId])
+  @@index([status])
   @@map("asset_supplements")
 }
 
@@ -456,7 +458,7 @@ model MasterAgreement {
   agreementVersion   String
   agreementText      String   @db.Text
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@map("master_agreements")
 }

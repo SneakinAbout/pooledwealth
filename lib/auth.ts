@@ -3,11 +3,12 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { Role } from '@prisma/client';
+import { rateLimit } from '@/lib/rateLimit';
 
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 14 * 24 * 60 * 60, // 14 days
   },
   pages: {
     signIn: '/login',
@@ -23,6 +24,11 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email and password are required');
+        }
+
+        // Rate limit: 5 login attempts per 15 minutes per email
+        if (!rateLimit(`login:${credentials.email.toLowerCase()}`, 5, 15 * 60 * 1000)) {
+          throw new Error('Too many login attempts. Please try again in 15 minutes.');
         }
 
         const user = await prisma.user.findUnique({

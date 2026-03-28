@@ -17,6 +17,7 @@ export async function POST(
     const permError = requireAdmin(session);
     if (permError) return permError;
 
+    // Fetch deposit for walletId/amount (read-only context)
     const deposit = await prisma.deposit.findUnique({
       where: { id: params.id },
       include: { wallet: true },
@@ -34,11 +35,17 @@ export async function POST(
 
     const amount = Number(deposit.amount);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.deposit.update({
-        where: { id: deposit.id },
+    // Atomic: use updateMany with WHERE status='PENDING' to prevent double-approve race
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.deposit.updateMany({
+        where: { id: deposit.id, status: 'PENDING' },
         data: { status: 'COMPLETED' },
       });
+
+      if (updated.count === 0) {
+        // Another admin already approved/rejected this deposit
+        return null;
+      }
 
       await tx.wallet.update({
         where: { id: deposit.walletId },
@@ -53,7 +60,13 @@ export async function POST(
           status: 'COMPLETED',
         },
       });
+
+      return true;
     });
+
+    if (result === null) {
+      return NextResponse.json({ error: 'Deposit has already been processed' }, { status: 409 });
+    }
 
     await auditLog(session!.user.id, 'APPROVE_BANK_DEPOSIT', deposit.id, {
       amount,

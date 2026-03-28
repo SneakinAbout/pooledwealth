@@ -11,6 +11,7 @@ export async function GET() {
   const withdrawals = await prisma.withdrawal.findMany({
     include: { user: { select: { id: true, name: true, email: true } } },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    take: 200,
   });
 
   return NextResponse.json(withdrawals.map((w) => ({

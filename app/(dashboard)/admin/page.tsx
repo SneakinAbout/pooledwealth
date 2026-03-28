@@ -4,13 +4,15 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import AdminDashboardClient from './AdminDashboardClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboardPage() {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== 'ADMIN') redirect('/investments');
 
   const [
     totalUsers,
-    wallets,
+    walletAggregate,
     activeInvestments,
     totalInvestments,
     pendingDeposits,
@@ -23,7 +25,7 @@ export default async function AdminDashboardPage() {
     pendingWithdrawals,
   ] = await Promise.all([
     prisma.user.count(),
-    prisma.wallet.findMany({ select: { balance: true } }),
+    prisma.wallet.aggregate({ _sum: { balance: true } }),
     prisma.investment.count({ where: { status: 'ACTIVE' } }),
     prisma.investment.count(),
     prisma.deposit.findMany({
@@ -32,6 +34,7 @@ export default async function AdminDashboardPage() {
         wallet: { include: { user: { select: { name: true, email: true } } } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     }),
     prisma.proposal.findMany({
       where: { status: 'DRAFT' },
@@ -40,11 +43,13 @@ export default async function AdminDashboardPage() {
         raisedBy: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     }),
     prisma.user.findMany({
       where: { kycApproved: false, role: 'INVESTOR' },
       select: { id: true, name: true, email: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     }),
     prisma.transaction.findMany({
       take: 20,
@@ -64,15 +69,17 @@ export default async function AdminDashboardPage() {
         _count: { select: { votes: true } },
       },
       orderBy: { closesAt: 'desc' },
+      take: 50,
     }),
     prisma.withdrawal.findMany({
       where: { status: 'PENDING' },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     }),
   ]);
 
-  const totalAUM = wallets.reduce((sum, w) => sum + Number(w.balance), 0);
+  const totalAUM = Number(walletAggregate._sum.balance ?? 0);
   const pendingActionsCount =
     pendingDeposits.length + draftProposals.length + pendingKycUsers.length + passedProposals.length + pendingWithdrawals.length;
 

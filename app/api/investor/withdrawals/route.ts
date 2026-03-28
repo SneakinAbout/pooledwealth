@@ -32,37 +32,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Please save your bank account details before requesting a withdrawal' }, { status: 400 });
   }
 
-  const balance = Number(user.wallet?.balance ?? 0);
-  if (amount > balance) {
-    return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 });
+  // Atomic: balance check + deduction inside transaction to prevent race condition
+  try {
+    const withdrawal = await prisma.$transaction(async (tx) => {
+      // Atomic balance check — updateMany with WHERE balance >= amount
+      const updated = await tx.wallet.updateMany({
+        where: { userId: user.id, balance: { gte: amount } },
+        data: { balance: { decrement: amount } },
+      });
+
+      if (updated.count === 0) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+
+      const wd = await tx.withdrawal.create({
+        data: {
+          userId: user.id,
+          amount,
+          bankAccountName: user.bankAccountName!,
+          bankBsb: user.bankBsb!,
+          bankAccountNumber: user.bankAccountNumber!,
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId: user.id,
+          type: 'WITHDRAWAL',
+          amount,
+          status: 'PENDING',
+        },
+      });
+
+      return wd;
+    });
+
+    return NextResponse.json(withdrawal, { status: 201 });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'INSUFFICIENT_BALANCE') {
+      return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 });
+    }
+    throw err;
   }
-
-  // Deduct from wallet immediately and create withdrawal record atomically
-  const [withdrawal] = await prisma.$transaction([
-    prisma.withdrawal.create({
-      data: {
-        userId: user.id,
-        amount,
-        bankAccountName: user.bankAccountName,
-        bankBsb: user.bankBsb,
-        bankAccountNumber: user.bankAccountNumber,
-      },
-    }),
-    prisma.wallet.update({
-      where: { userId: user.id },
-      data: { balance: { decrement: amount } },
-    }),
-    prisma.transaction.create({
-      data: {
-        userId: user.id,
-        type: 'WITHDRAWAL',
-        amount,
-        status: 'PENDING',
-      },
-    }),
-  ]);
-
-  return NextResponse.json(withdrawal, { status: 201 });
 }
 
 // GET /api/investor/withdrawals — list own withdrawals
