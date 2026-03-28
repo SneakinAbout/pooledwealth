@@ -49,7 +49,7 @@ const navGroups: Record<string, NavGroup[]> = {
     {
       label: 'Account',
       items: [
-        { label: 'Settings', href: '/investor/settings', icon: UserCog },
+        { label: 'My Account', href: '/investor/settings', icon: UserCog },
       ],
     },
   ],
@@ -71,7 +71,7 @@ const navGroups: Record<string, NavGroup[]> = {
     {
       label: 'Account',
       items: [
-        { label: 'Settings', href: '/investor/settings', icon: UserCog },
+        { label: 'My Account', href: '/investor/settings', icon: UserCog },
       ],
     },
   ],
@@ -109,7 +109,7 @@ const navGroups: Record<string, NavGroup[]> = {
     {
       label: 'Account',
       items: [
-        { label: 'Settings', href: '/investor/settings', icon: UserCog },
+        { label: 'My Account', href: '/investor/settings', icon: UserCog },
       ],
     },
   ],

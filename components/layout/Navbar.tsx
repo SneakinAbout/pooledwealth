@@ -20,7 +20,7 @@ const routeTitles: Record<string, string> = {
   '/admin/deposits': 'Bank Deposits',
   '/admin/settings': 'Settings',
   '/admin/analytics': 'Analytics',
-  '/investor/settings': 'Account Settings',
+  '/investor/settings': 'My Account',
 };
 
 function getPageTitle(pathname: string): string {
