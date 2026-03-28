@@ -20,7 +20,7 @@ interface SettingsHistory {
   updatedBy: {
     name: string;
     email: string;
-  };
+  } | null;
 }
 
 interface FeeSettingsFormProps {
@@ -130,7 +130,7 @@ export default function FeeSettingsForm({
                     share: {Number(item.profitSharePercent).toFixed(2)}%
                   </span>
                   <p className="text-[#6A5A40] text-xs mt-0.5">
-                    by {item.updatedBy.name} ({item.updatedBy.email})
+                    by {item.updatedBy?.name ?? 'Unknown'} ({item.updatedBy?.email ?? '—'})
                   </p>
                 </div>
                 <div className="text-right">

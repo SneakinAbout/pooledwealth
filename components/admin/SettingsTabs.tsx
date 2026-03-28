@@ -37,7 +37,7 @@ interface HistoryEntry {
   managementFeePercent: number;
   profitSharePercent: number;
   updatedAt: string;
-  updatedBy: { name: string; email: string };
+  updatedBy: { name: string; email: string } | null;
 }
 
 const TABS = [
@@ -116,7 +116,7 @@ function FeeTab({ current, history }: { current: CurrentSettings; history: Histo
                   <span className="text-[#1A1207] font-medium">
                     Mgmt: {Number(item.managementFeePercent).toFixed(2)}% &nbsp;·&nbsp; Profit share: {Number(item.profitSharePercent).toFixed(2)}%
                   </span>
-                  <p className="text-[#6A5A40] text-xs mt-0.5">by {item.updatedBy.name} ({item.updatedBy.email})</p>
+                  <p className="text-[#6A5A40] text-xs mt-0.5">by {item.updatedBy?.name ?? 'Unknown'} ({item.updatedBy?.email ?? '—'})</p>
                 </div>
                 <div className="text-right">
                   <span className="text-[#8A7A60] text-xs">{formatDate(item.updatedAt)}</span>
