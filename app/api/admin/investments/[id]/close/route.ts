@@ -9,6 +9,9 @@ import { requireAdmin } from '@/lib/permissions';
  * Closes an investment after its subscription period:
  * - If minimumRaise was met: sets status to CLOSED, locks it
  * - If minimumRaise NOT met: sets status to ARCHIVED, refunds all investors
+ *
+ * All reads and writes happen inside a single transaction to prevent
+ * race conditions where investors buy units during the close operation.
  */
 export async function POST(
   _req: NextRequest,
@@ -19,44 +22,53 @@ export async function POST(
     const permError = requireAdmin(session);
     if (permError) return permError;
 
-    const investment = await prisma.investment.findUnique({
+    // Quick pre-check outside transaction for early 404/409 feedback
+    const preCheck = await prisma.investment.findUnique({
       where: { id: params.id },
-      include: {
-        holdings: {
-          include: { user: { select: { email: true, name: true } } },
-        },
-      },
+      select: { status: true },
     });
-
-    if (!investment) return NextResponse.json({ error: 'Investment not found' }, { status: 404 });
-    if (investment.status !== 'ACTIVE') {
+    if (!preCheck) return NextResponse.json({ error: 'Investment not found' }, { status: 404 });
+    if (preCheck.status !== 'ACTIVE') {
       return NextResponse.json({ error: 'Only ACTIVE investments can be closed' }, { status: 409 });
     }
 
-    const soldUnits = investment.totalUnits - investment.availableUnits;
-    const totalRaised = Number(investment.pricePerUnit) * soldUnits;
-    const minimumRaise = Number(investment.minimumRaise ?? 0);
-    const minimumMet = minimumRaise === 0 || totalRaised >= minimumRaise;
+    // All authoritative logic inside a single transaction — re-fetch investment
+    // and holdings here so we see the true final state with no race conditions.
+    const result = await prisma.$transaction(async (tx) => {
+      const investment = await tx.investment.findUnique({
+        where: { id: params.id },
+        include: {
+          holdings: {
+            include: { user: { select: { email: true, name: true } } },
+          },
+        },
+      });
 
-    if (minimumMet) {
-      // Success — close, lock, and create trust disbursement record
-      await prisma.$transaction(async (tx) => {
+      if (!investment || investment.status !== 'ACTIVE') {
+        throw Object.assign(new Error('Only ACTIVE investments can be closed'), { status: 409 });
+      }
+
+      const soldUnits = investment.totalUnits - investment.availableUnits;
+      const totalRaised = Number(investment.pricePerUnit) * soldUnits;
+      const minimumRaise = Number(investment.minimumRaise ?? 0);
+      // minimumRaise is a unit count; compare sold units (not dollars) to the minimum
+      const minimumMet = minimumRaise === 0 || soldUnits >= minimumRaise;
+
+      if (minimumMet) {
+        // Success — close, lock, and create trust disbursement record
         await tx.investment.update({
           where: { id: params.id },
           data: { status: 'CLOSED', locked: true },
         });
-        // Auto-create disbursement record so admin can track trust outflows
         await tx.trustDisbursement.upsert({
           where: { investmentId: params.id },
           update: { totalRaised },
           create: { investmentId: params.id, totalRaised },
         });
-      });
-      return NextResponse.json({ outcome: 'closed', totalRaised, minimumMet: true });
-    }
+        return { outcome: 'closed', totalRaised, minimumMet: true, refundedCount: 0 };
+      }
 
-    // Failed raise — refund all investors
-    await prisma.$transaction(async (tx) => {
+      // Failed raise — archive and refund all investors
       await tx.investment.update({
         where: { id: params.id },
         data: { status: 'ARCHIVED' },
@@ -65,23 +77,19 @@ export async function POST(
       for (const holding of investment.holdings) {
         const refundAmount = Number(holding.purchasePrice);
 
-        // Delete the holding
         await tx.holding.delete({ where: { id: holding.id } });
 
-        // Restore available units
         await tx.investment.update({
           where: { id: params.id },
           data: { availableUnits: { increment: holding.unitsPurchased } },
         });
 
-        // Refund wallet
         await tx.wallet.upsert({
           where: { userId: holding.userId },
           update: { balance: { increment: refundAmount } },
           create: { userId: holding.userId, balance: refundAmount },
         });
 
-        // Record refund transaction
         await tx.transaction.create({
           data: {
             userId: holding.userId,
@@ -93,15 +101,19 @@ export async function POST(
           },
         });
       }
+
+      return {
+        outcome: 'refunded',
+        totalRaised,
+        minimumRaise,
+        refundedCount: investment.holdings.length,
+      };
     });
 
-    return NextResponse.json({
-      outcome: 'refunded',
-      totalRaised,
-      minimumRaise,
-      refundedCount: investment.holdings.length,
-    });
+    return NextResponse.json(result);
   } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status) return NextResponse.json({ error: e.message }, { status: e.status });
     console.error('[POST /api/admin/investments/[id]/close]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
