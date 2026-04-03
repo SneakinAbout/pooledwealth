@@ -26,6 +26,7 @@ type ReturnsData = {
     netReturn: number;
   };
   breakdown: Breakdown[];
+  platformFees: number;
 };
 
 const fmt = (n: number) =>
@@ -104,6 +105,7 @@ export default function ReturnsClient() {
         b.netReturn.toFixed(2),
       ]),
       [],
+      ...(data.platformFees > 0 ? [['Platform Management Fees', '', '', data.platformFees.toFixed(2), '', '', (-data.platformFees).toFixed(2)]] : []),
       ['TOTAL', '',
         data.summary.totalDistributions.toFixed(2),
         data.summary.totalFees.toFixed(2),
@@ -292,6 +294,18 @@ export default function ReturnsClient() {
                     ))}
                   </tbody>
                   <tfoot>
+                    {data.platformFees > 0 && (
+                      <tr className="border-t border-[#E8E2D6] bg-red-50/40">
+                        <td className="py-3 pl-1">
+                          <p className="font-medium text-[#1A1207]">Platform Management Fees</p>
+                          <p className="text-xs text-[#8A7A60]">Charged on held assets</p>
+                        </td>
+                        <td className="py-3 text-right text-[#8A7A60] font-mono-val">—</td>
+                        <td className="py-3 text-right text-red-600 font-mono-val">−{fmt(data.platformFees)}</td>
+                        <td className="py-3 text-right text-[#8A7A60] font-mono-val">—</td>
+                        <td className="py-3 text-right text-red-600 font-semibold font-mono-val">−{fmt(data.platformFees)}</td>
+                      </tr>
+                    )}
                     <tr className="border-t-2 border-[#1A2B1F]">
                       <td className="pt-3 font-semibold text-[#1A1207]">Total</td>
                       <td className="pt-3 text-right text-green-700 font-semibold font-mono-val">+{fmt(data.summary.totalDistributions)}</td>

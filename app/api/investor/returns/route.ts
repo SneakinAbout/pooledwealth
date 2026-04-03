@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
 
     const netReturn = totalDistributions + totalRedemptions - totalPurchases - totalFees;
 
+    const platformFees = byInvestment['__wallet__']?.fees ?? 0;
+
     return NextResponse.json({
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
@@ -117,6 +119,7 @@ export async function GET(request: NextRequest) {
         netReturn,
       },
       breakdown,
+      platformFees,
     });
   } catch (err) {
     console.error('[GET /api/investor/returns]', err);
