@@ -21,9 +21,12 @@ export async function chargeManagementFees(): Promise<ChargeResult> {
   const [settings, users] = await Promise.all([
     prisma.platformSettings.findFirst({ orderBy: { updatedAt: 'desc' } }),
     prisma.user.findMany({
-      where: { holdings: { some: { soldAt: null } } },
+      where: { holdings: { some: { soldAt: null, investment: { status: 'CLOSED' } } } },
       include: {
-        holdings: { where: { soldAt: null }, select: { purchasePrice: true } },
+        holdings: {
+          where: { soldAt: null, investment: { status: 'CLOSED' } },
+          select: { purchasePrice: true },
+        },
       },
     }),
   ]);
