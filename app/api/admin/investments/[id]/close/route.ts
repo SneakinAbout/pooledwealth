@@ -38,10 +38,18 @@ export async function POST(
   const minimumMet = minimumRaise === 0 || totalRaised >= minimumRaise;
 
   if (minimumMet) {
-    // Success — close and lock
-    await prisma.investment.update({
-      where: { id: params.id },
-      data: { status: 'CLOSED', locked: true },
+    // Success — close, lock, and create trust disbursement record
+    await prisma.$transaction(async (tx) => {
+      await tx.investment.update({
+        where: { id: params.id },
+        data: { status: 'CLOSED', locked: true },
+      });
+      // Auto-create disbursement record so admin can track trust outflows
+      await tx.trustDisbursement.upsert({
+        where: { investmentId: params.id },
+        update: { totalRaised },
+        create: { investmentId: params.id, totalRaised },
+      });
     });
     return NextResponse.json({ outcome: 'closed', totalRaised, minimumMet: true });
   }

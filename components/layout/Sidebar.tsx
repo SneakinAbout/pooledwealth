@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   UserCog,
   Bookmark,
+  ShieldCheck,
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -98,6 +99,7 @@ const navGroups: Record<string, NavGroup[]> = {
         { label: 'Fee Collection', href: '/admin/fees', icon: Receipt },
         { label: 'Distributions', href: '/admin/distributions', icon: DollarSign },
         { label: 'Bank Deposits', href: '/admin/deposits', icon: Landmark },
+        { label: 'Trust Account', href: '/admin/trust', icon: ShieldCheck },
       ],
     },
     {

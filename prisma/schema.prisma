@@ -108,6 +108,7 @@ model User {
   investmentUpdates     InvestmentUpdate[]
   masterAgreement       MasterAgreement?
   assetSupplements      AssetSupplement[]
+  trustDisbursements    TrustDisbursement[]
 
   @@map("users")
 }
@@ -175,13 +176,14 @@ model Investment {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  holdings         Holding[]
-  transactions     Transaction[]
-  distributions    Distribution[]
-  proposals        Proposal[]
-  updates          InvestmentUpdate[]
-  watchlistItems   WatchlistItem[]
-  assetSupplements AssetSupplement[]
+  holdings           Holding[]
+  transactions       Transaction[]
+  distributions      Distribution[]
+  proposals          Proposal[]
+  updates            InvestmentUpdate[]
+  watchlistItems     WatchlistItem[]
+  assetSupplements   AssetSupplement[]
+  trustDisbursement  TrustDisbursement?
 
   @@index([status])
   @@index([createdAt])
@@ -461,4 +463,36 @@ model MasterAgreement {
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@map("master_agreements")
+}
+
+// Tracks the physical movement of funds out of trust for each closed investment:
+// 1. vendorAmount/disbursedAt — payment to asset vendor (trust → vendor)
+// 2. platformFeeAmount/platformFeeExtractedAt — fee transfer (trust → general account)
+model TrustDisbursement {
+  id           String   @id @default(cuid())
+  investmentId String   @unique
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+
+  // Total capital raised from investors for this investment
+  totalRaised  Decimal  @db.Decimal(18, 2)
+
+  // Vendor payment: money leaving trust to purchase the underlying asset
+  vendorAmount    Decimal?  @db.Decimal(18, 2)
+  disbursedAt     DateTime?
+  disbursementRef String?
+
+  // Platform fee: transferred from trust to general account
+  platformFeeAmount       Decimal?  @db.Decimal(18, 2)
+  platformFeeExtractedAt  DateTime?
+  feeRef                  String?
+
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([investmentId])
+  @@map("trust_disbursements")
 }
