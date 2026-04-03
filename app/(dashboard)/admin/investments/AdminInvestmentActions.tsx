@@ -19,6 +19,23 @@ export default function AdminInvestmentActions({ investmentId, status }: Props) 
   const handleStatusChange = async (newStatus: string) => {
     setLoading(true);
     try {
+      // Closing a round must go through the dedicated close route so that
+      // trust disbursement records and refunds are handled correctly.
+      if (newStatus === 'CLOSED') {
+        const res = await fetch(`/api/admin/investments/${investmentId}/close`, {
+          method: 'POST',
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error);
+        if (result.outcome === 'refunded') {
+          toast.success(`Minimum raise not met — ${result.refundedCount} investor(s) refunded`);
+        } else {
+          toast.success('Investment round closed — trust disbursement record created');
+        }
+        router.refresh();
+        return;
+      }
+
       const res = await fetch(`/api/investments/${investmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
