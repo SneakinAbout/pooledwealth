@@ -86,7 +86,16 @@ export async function GET() {
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
   const totalMgmtFeesCharged = Number(mgmtFeeAggregate._sum.amount ?? 0);
   const totalMgmtFeesSwept = Number(mgmtFeeSweepAggregate._sum.amount ?? 0);
-  const mgmtFeesAwaitingSweep = Math.max(0, totalMgmtFeesCharged - totalMgmtFeesSwept);
+
+  // Fees awaiting sweep = fees charged since the last sweep date (each cycle independent)
+  const lastSweepDate = feeExtractions.length > 0 ? new Date(feeExtractions[0].extractedAt) : null;
+  const feesChargedSinceLastSweep = lastSweepDate
+    ? await prisma.transaction.aggregate({
+        where: { type: 'FEE', status: 'COMPLETED', investmentId: null, createdAt: { gt: lastSweepDate } },
+        _sum: { amount: true },
+      }).then((r) => Number(r._sum.amount ?? 0))
+    : totalMgmtFeesCharged;
+  const mgmtFeesAwaitingSweep = feesChargedSinceLastSweep;
 
   // Asset sale proceeds: recorded against each distribution
   const totalSaleProceeds = distributions.reduce(

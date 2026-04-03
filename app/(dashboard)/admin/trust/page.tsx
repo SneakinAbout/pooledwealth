@@ -49,7 +49,16 @@ export default async function TrustPage() {
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
   const totalMgmtFeesCharged = Number(mgmtFeeAggregate._sum.amount ?? 0);
   const totalMgmtFeesSwept = Number(mgmtFeeSweepAggregate._sum.amount ?? 0);
-  const mgmtFeesAwaitingSweep = Math.max(0, totalMgmtFeesCharged - totalMgmtFeesSwept);
+
+  // Calculate fees charged since the last sweep (so each sweep cycle is independent)
+  const lastSweepDate = feeExtractions.length > 0 ? new Date(feeExtractions[0].extractedAt) : null;
+  const feesChargedSinceLastSweep = lastSweepDate
+    ? await prisma.transaction.aggregate({
+        where: { type: 'FEE', status: 'COMPLETED', investmentId: null, createdAt: { gt: lastSweepDate } },
+        _sum: { amount: true },
+      }).then((r) => Number(r._sum.amount ?? 0))
+    : totalMgmtFeesCharged;
+  const mgmtFeesAwaitingSweep = feesChargedSinceLastSweep;
 
   const totalSaleProceeds = distributions.reduce((sum, d) => sum + Number(d.saleProceeds ?? 0), 0);
 

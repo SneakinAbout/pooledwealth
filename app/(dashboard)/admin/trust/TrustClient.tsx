@@ -100,7 +100,7 @@ export default function TrustClient({
   const [notes, setNotes] = useState('');
 
   function openMgmtSweepModal() {
-    setAmount(summary.mgmtFeesAwaitingSweep > 0 ? summary.mgmtFeesAwaitingSweep.toFixed(2) : '');
+    setAmount(summary.mgmtFeesAwaitingSweep > 0.01 ? summary.mgmtFeesAwaitingSweep.toFixed(2) : '');
     setDate(new Date().toISOString().slice(0, 10));
     setBankRef('');
     setNotes('');
@@ -189,10 +189,13 @@ export default function TrustClient({
   const actionItems: { id: string; label: string; sublabel: string; amount: number; tag: string; onAction: () => void }[] = [];
 
   if (summary.mgmtFeesAwaitingSweep > 0.01) {
+    const lastSweep = feeExtractions.length > 0 ? fmtDate(feeExtractions[0].extractedAt) : null;
     actionItems.push({
       id: 'mgmt-sweep',
       label: 'Transfer management fees to general account',
-      sublabel: 'Pooled monthly fees charged from investor wallets',
+      sublabel: lastSweep
+        ? `Fees charged since last sweep on ${lastSweep}`
+        : 'Pooled monthly fees charged from investor wallets',
       amount: summary.mgmtFeesAwaitingSweep,
       tag: 'Fee Sweep',
       onAction: openMgmtSweepModal,
