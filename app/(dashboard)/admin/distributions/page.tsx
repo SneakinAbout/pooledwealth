@@ -15,8 +15,8 @@ export default async function DistributionsPage() {
 
   const [activeInvestments, settings, distributions] = await Promise.all([
     prisma.investment.findMany({
-      where: { status: 'ACTIVE' },
-      select: { id: true, title: true, holdings: { select: { purchasePrice: true } } },
+      where: { status: { in: ['ACTIVE', 'CLOSED'] } },
+      select: { id: true, title: true, status: true, holdings: { select: { purchasePrice: true } } },
       orderBy: { title: 'asc' },
     }),
     prisma.platformSettings.findFirst({ orderBy: { updatedAt: 'desc' } }),
@@ -76,7 +76,7 @@ export default async function DistributionsPage() {
           </p>
         ) : (
           <DistributionTool
-            investments={activeInvestments.map(({ id, title }) => ({ id, title }))}
+            investments={activeInvestments.map(({ id, title, status }) => ({ id, title, status }))}
             settings={feeSettings}
             investmentCostBases={investmentCostBases}
           />

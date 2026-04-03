@@ -13,11 +13,12 @@ import { Card } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/utils';
 import { calculateDistributionFees } from '@/lib/fees';
 import { distributionSchema, type DistributionInput } from '@/lib/validations';
-import { CheckCircle, DollarSign } from 'lucide-react';
+import { AlertTriangle, CheckCircle, DollarSign } from 'lucide-react';
 
 interface Investment {
   id: string;
   title: string;
+  status: string;
 }
 
 interface FeeSettings {
@@ -57,6 +58,8 @@ export default function DistributionTool({
 
   const amount = watch('totalAmount');
   const selectedInvestmentId = watch('investmentId');
+  const selectedInvestment = investments.find((inv) => inv.id === selectedInvestmentId);
+  const isFinalDistribution = selectedInvestment?.status === 'CLOSED';
 
   const handlePreview = () => {
     if (!amount || amount <= 0) return;
@@ -78,7 +81,7 @@ export default function DistributionTool({
       if (!res.ok) throw new Error(result.error);
 
       setSuccess(true);
-      toast.success('Distribution processed successfully!');
+      toast.success(isFinalDistribution ? 'Final distribution complete — investment marked as Exited' : 'Distribution processed successfully!');
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Distribution failed');
@@ -111,6 +114,20 @@ export default function DistributionTool({
           error={errors.investmentId?.message}
           {...register('investmentId')}
         />
+
+        {isFinalDistribution && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-800">Final Distribution — Investment will be marked as Exited</p>
+              <p className="text-amber-700 mt-0.5">
+                This investment is <strong>Closed</strong>. Running this distribution will pay out all co-owners,
+                remove the investment from their portfolios, and mark it as <strong>Exited</strong>.
+                This action cannot be undone.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <div className="flex-1">
