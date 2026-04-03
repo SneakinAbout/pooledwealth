@@ -24,6 +24,7 @@ type DisbursementRecord = {
 type Summary = {
   totalDeposited: number;
   totalWithdrawn: number;
+  totalFeesCharged: number;
   totalVendorDisbursed: number;
   totalFeesExtracted: number;
   expectedBalance: number;
@@ -178,18 +179,22 @@ export default function TrustClient({ summary: initialSummary, disbursements: in
                 <span className="text-white font-medium">{fmt(summary.totalWithdrawn)}</span>
               </div>
               <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Management fees charged</span>
+                <span className="text-white font-medium">{fmt(summary.totalFeesCharged)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Vendor payments (asset purchases)</span>
                 <span className="text-white font-medium">{fmt(summary.totalVendorDisbursed)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Platform fees extracted</span>
+                <span className="text-gray-400">Platform fees extracted to general account</span>
                 <span className="text-white font-medium">{fmt(summary.totalFeesExtracted)}</span>
               </div>
             </div>
             <div className="border-t border-navy-600 pt-2 flex justify-between text-sm font-semibold">
               <span className="text-red-400">Total OUT</span>
               <span className="text-red-400">
-                {fmt(summary.totalWithdrawn + summary.totalVendorDisbursed + summary.totalFeesExtracted)}
+                {fmt(summary.totalWithdrawn + summary.totalFeesCharged + summary.totalVendorDisbursed + summary.totalFeesExtracted)}
               </span>
             </div>
           </div>

@@ -10,7 +10,7 @@ export default async function TrustPage() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== 'ADMIN') redirect('/investments');
 
-  const [depositAggregate, withdrawalAggregate, disbursements, walletAggregate] =
+  const [depositAggregate, withdrawalAggregate, feeAggregate, disbursements, walletAggregate] =
     await Promise.all([
       prisma.deposit.aggregate({
         where: { status: 'COMPLETED' },
@@ -18,6 +18,10 @@ export default async function TrustPage() {
       }),
       prisma.withdrawal.aggregate({
         where: { status: 'COMPLETED' },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { type: 'FEE', status: 'COMPLETED' },
         _sum: { amount: true },
       }),
       prisma.trustDisbursement.findMany({
@@ -34,6 +38,7 @@ export default async function TrustPage() {
 
   const totalDeposited = Number(depositAggregate._sum.amount ?? 0);
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
+  const totalFeesCharged = Number(feeAggregate._sum.amount ?? 0);
 
   const totalVendorDisbursed = disbursements
     .filter((d) => d.disbursedAt !== null)
@@ -44,7 +49,7 @@ export default async function TrustPage() {
     .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
 
   const expectedBalance =
-    totalDeposited - totalWithdrawn - totalVendorDisbursed - totalFeesExtracted;
+    totalDeposited - totalWithdrawn - totalFeesCharged - totalVendorDisbursed - totalFeesExtracted;
 
   const actualBalance = Number(walletAggregate._sum.balance ?? 0);
   const discrepancy = actualBalance - expectedBalance;
@@ -62,6 +67,7 @@ export default async function TrustPage() {
       summary={{
         totalDeposited,
         totalWithdrawn,
+        totalFeesCharged,
         totalVendorDisbursed,
         totalFeesExtracted,
         expectedBalance,

@@ -16,8 +16,10 @@ export const dynamic = 'force-dynamic';
  *
  * Trust OUT:
  *   - All COMPLETED withdrawals (paid back to investors)
- *   - Vendor disbursements recorded (trust → asset vendor)
- *   - Platform fee extractions recorded (trust → general account)
+ *   - Management fees charged from investor wallets (FEE transactions)
+ *   - Unit purchases by investors (PURCHASE transactions — funds committed to deals)
+ *   - Vendor disbursements recorded (trust → asset vendor, manual record)
+ *   - Platform fee extractions recorded (trust → general account, manual record)
  *
  * Expected trust balance = IN - OUT
  * Actual recorded balance = sum of all wallet balances
@@ -31,6 +33,7 @@ export async function GET() {
   const [
     depositAggregate,
     withdrawalAggregate,
+    feeAggregate,
     disbursements,
     walletAggregate,
     pendingDisbursements,
@@ -44,6 +47,12 @@ export async function GET() {
     // Total funds paid out to investors (COMPLETED withdrawals)
     prisma.withdrawal.aggregate({
       where: { status: 'COMPLETED' },
+      _sum: { amount: true },
+    }),
+
+    // Total management fees charged from investor wallets
+    prisma.transaction.aggregate({
+      where: { type: 'FEE', status: 'COMPLETED' },
       _sum: { amount: true },
     }),
 
@@ -73,6 +82,7 @@ export async function GET() {
 
   const totalDeposited = Number(depositAggregate._sum.amount ?? 0);
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
+  const totalFeesCharged = Number(feeAggregate._sum.amount ?? 0);
 
   const totalVendorDisbursed = disbursements
     .filter((d) => d.disbursedAt !== null)
@@ -82,8 +92,9 @@ export async function GET() {
     .filter((d) => d.platformFeeExtractedAt !== null)
     .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
 
+  // Fees charged reduce wallet balances (actual), so must be included in expected OUT
   const expectedBalance =
-    totalDeposited - totalWithdrawn - totalVendorDisbursed - totalFeesExtracted;
+    totalDeposited - totalWithdrawn - totalFeesCharged - totalVendorDisbursed - totalFeesExtracted;
 
   const actualBalance = Number(walletAggregate._sum.balance ?? 0);
   const discrepancy = actualBalance - expectedBalance;
@@ -102,6 +113,7 @@ export async function GET() {
     summary: {
       totalDeposited,
       totalWithdrawn,
+      totalFeesCharged,
       totalVendorDisbursed,
       totalFeesExtracted,
       expectedBalance,
