@@ -109,6 +109,7 @@ model User {
   masterAgreement       MasterAgreement?
   assetSupplements      AssetSupplement[]
   trustDisbursements    TrustDisbursement[]
+  trustFeeExtractions   TrustFeeExtraction[]
 
   @@map("users")
 }
@@ -463,6 +464,24 @@ model MasterAgreement {
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@map("master_agreements")
+}
+
+// Records each time the admin sweeps pooled management fees from trust → general account.
+// Management fees are charged monthly across all investors and pool up in trust.
+// This model tracks each physical bank transfer extracting those pooled fees.
+model TrustFeeExtraction {
+  id          String   @id @default(cuid())
+  amount      Decimal  @db.Decimal(18, 2)
+  extractedAt DateTime
+  bankRef     String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([extractedAt])
+  @@map("trust_fee_extractions")
 }
 
 // Tracks the physical movement of funds out of trust for each closed investment:

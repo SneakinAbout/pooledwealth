@@ -34,29 +34,33 @@ export async function GET() {
     depositAggregate,
     withdrawalAggregate,
     feeAggregate,
+    feeExtractionAggregate,
+    feeExtractions,
     disbursements,
     walletAggregate,
     pendingDisbursements,
   ] = await Promise.all([
-    // Total funds ever deposited into trust (COMPLETED only)
     prisma.deposit.aggregate({
       where: { status: 'COMPLETED' },
       _sum: { amount: true },
     }),
-
-    // Total funds paid out to investors (COMPLETED withdrawals)
     prisma.withdrawal.aggregate({
       where: { status: 'COMPLETED' },
       _sum: { amount: true },
     }),
-
-    // Total management fees charged from investor wallets
     prisma.transaction.aggregate({
       where: { type: 'FEE', status: 'COMPLETED' },
       _sum: { amount: true },
     }),
-
-    // All trust disbursement records (vendor + fee extractions)
+    // Total management fees already swept to general account
+    prisma.trustFeeExtraction.aggregate({
+      _sum: { amount: true },
+    }),
+    // All fee extraction records for action list
+    prisma.trustFeeExtraction.findMany({
+      include: { recordedBy: { select: { name: true } } },
+      orderBy: { extractedAt: 'desc' },
+    }),
     prisma.trustDisbursement.findMany({
       include: {
         investment: { select: { id: true, title: true, status: true } },
@@ -64,18 +68,11 @@ export async function GET() {
       },
       orderBy: { createdAt: 'desc' },
     }),
-
-    // Current sum of all wallet balances (actual trust balance)
     prisma.wallet.aggregate({
       _sum: { balance: true },
     }),
-
-    // CLOSED investments with no disbursement yet (shouldn't happen after schema change, but defensive)
     prisma.investment.findMany({
-      where: {
-        status: 'CLOSED',
-        trustDisbursement: null,
-      },
+      where: { status: 'CLOSED', trustDisbursement: null },
       select: { id: true, title: true },
     }),
   ]);
@@ -83,29 +80,30 @@ export async function GET() {
   const totalDeposited = Number(depositAggregate._sum.amount ?? 0);
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
   const totalFeesCharged = Number(feeAggregate._sum.amount ?? 0);
+  const totalMgmtFeesSwept = Number(feeExtractionAggregate._sum.amount ?? 0);
 
   const totalVendorDisbursed = disbursements
     .filter((d) => d.disbursedAt !== null)
     .reduce((sum, d) => sum + Number(d.vendorAmount ?? 0), 0);
 
-  const totalFeesExtracted = disbursements
+  const totalInvestmentFeesExtracted = disbursements
     .filter((d) => d.platformFeeExtractedAt !== null)
     .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
 
-  // Fees charged reduce wallet balances (actual), so must be included in expected OUT
+  // Management fees sitting in trust but not yet swept to general account
+  const mgmtFeesAwaitingSweep = totalFeesCharged - totalMgmtFeesSwept;
+
   const expectedBalance =
-    totalDeposited - totalWithdrawn - totalFeesCharged - totalVendorDisbursed - totalFeesExtracted;
+    totalDeposited - totalWithdrawn - totalFeesCharged - totalVendorDisbursed - totalInvestmentFeesExtracted - totalMgmtFeesSwept;
 
   const actualBalance = Number(walletAggregate._sum.balance ?? 0);
   const discrepancy = actualBalance - expectedBalance;
 
-  // Capital committed to investments but not yet disbursed to vendors
   const pendingVendorDisbursement = disbursements
     .filter((d) => d.disbursedAt === null)
     .reduce((sum, d) => sum + Number(d.totalRaised), 0);
 
-  // Platform fees accrued but not yet extracted
-  const pendingFeeExtraction = disbursements
+  const pendingInvestmentFeeExtraction = disbursements
     .filter((d) => d.platformFeeAmount !== null && d.platformFeeExtractedAt === null)
     .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
 
@@ -114,14 +112,25 @@ export async function GET() {
       totalDeposited,
       totalWithdrawn,
       totalFeesCharged,
+      totalMgmtFeesSwept,
+      mgmtFeesAwaitingSweep,
       totalVendorDisbursed,
-      totalFeesExtracted,
+      totalInvestmentFeesExtracted,
       expectedBalance,
       actualBalance,
       discrepancy,
       pendingVendorDisbursement,
-      pendingFeeExtraction,
+      pendingInvestmentFeeExtraction,
     },
+    feeExtractions: feeExtractions.map((e) => ({
+      id: e.id,
+      amount: Number(e.amount),
+      extractedAt: e.extractedAt.toISOString(),
+      bankRef: e.bankRef,
+      notes: e.notes,
+      recordedBy: e.recordedBy?.name ?? null,
+      createdAt: e.createdAt.toISOString(),
+    })),
     disbursements: disbursements.map((d) => ({
       id: d.id,
       investmentId: d.investmentId,
