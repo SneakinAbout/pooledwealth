@@ -6,22 +6,16 @@ import { requireAdmin } from '@/lib/permissions';
 import { z } from 'zod';
 
 const patchSchema = z.object({
-  // Vendor payment fields
   vendorAmount: z.number().positive().optional(),
   disbursedAt: z.string().datetime().optional(),
   disbursementRef: z.string().max(200).optional(),
-
-  // Fee extraction fields
-  platformFeeAmount: z.number().positive().optional(),
-  platformFeeExtractedAt: z.string().datetime().optional(),
-  feeRef: z.string().max(200).optional(),
-
   notes: z.string().max(2000).optional(),
 });
 
 /**
  * PATCH /api/admin/trust/disbursements/[id]
- * Records vendor payment and/or platform fee extraction for a trust disbursement.
+ * Records the vendor payment for an investment (trust → vendor).
+ * Profit share is tracked per Distribution, not here.
  */
 export async function PATCH(
   request: NextRequest,
@@ -49,11 +43,6 @@ export async function PATCH(
       ...(data.vendorAmount !== undefined && { vendorAmount: data.vendorAmount }),
       ...(data.disbursedAt !== undefined && { disbursedAt: new Date(data.disbursedAt) }),
       ...(data.disbursementRef !== undefined && { disbursementRef: data.disbursementRef }),
-      ...(data.platformFeeAmount !== undefined && { platformFeeAmount: data.platformFeeAmount }),
-      ...(data.platformFeeExtractedAt !== undefined && {
-        platformFeeExtractedAt: new Date(data.platformFeeExtractedAt),
-      }),
-      ...(data.feeRef !== undefined && { feeRef: data.feeRef }),
       ...(data.notes !== undefined && { notes: data.notes }),
       recordedById: session!.user.id,
     },

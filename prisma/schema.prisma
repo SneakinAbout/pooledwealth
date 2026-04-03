@@ -110,6 +110,7 @@ model User {
   assetSupplements      AssetSupplement[]
   trustDisbursements    TrustDisbursement[]
   trustFeeExtractions   TrustFeeExtraction[]
+  profitShareSweeps     Distribution[]       @relation("ProfitShareSweeps")
 
   @@map("users")
 }
@@ -267,6 +268,16 @@ model Distribution {
   netAmount           Decimal  @db.Decimal(18, 2)
   distributedAt       DateTime @default(now())
   notes               String?  @db.Text
+
+  // Trust tracking: sale proceeds received into trust bank account from buyer
+  saleProceeds        Decimal?  @db.Decimal(18, 2)  // gross amount received from buyer
+  saleProceedsRef     String?                        // buyer bank reference
+
+  // Profit share sweep: when admin transfers profit share from trust → general account
+  profitShareSweptAt  DateTime?
+  profitShareSweptRef String?
+  profitShareSweptById String?
+  profitShareSweptBy   User?   @relation("ProfitShareSweeps", fields: [profitShareSweptById], references: [id], onDelete: SetNull)
 
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
@@ -484,9 +495,9 @@ model TrustFeeExtraction {
   @@map("trust_fee_extractions")
 }
 
-// Tracks the physical movement of funds out of trust for each closed investment:
-// 1. vendorAmount/disbursedAt — payment to asset vendor (trust → vendor)
-// 2. platformFeeAmount/platformFeeExtractedAt — fee transfer (trust → general account)
+// Tracks capital flows for each closed investment:
+// vendorAmount/disbursedAt — trust → vendor (paying to acquire the physical asset)
+// Profit share is tracked per Distribution (when the asset eventually sells), not here.
 model TrustDisbursement {
   id           String   @id @default(cuid())
   investmentId String   @unique
@@ -499,11 +510,6 @@ model TrustDisbursement {
   vendorAmount    Decimal?  @db.Decimal(18, 2)
   disbursedAt     DateTime?
   disbursementRef String?
-
-  // Platform fee: transferred from trust to general account
-  platformFeeAmount       Decimal?  @db.Decimal(18, 2)
-  platformFeeExtractedAt  DateTime?
-  feeRef                  String?
 
   notes       String?  @db.Text
   createdAt   DateTime @default(now())

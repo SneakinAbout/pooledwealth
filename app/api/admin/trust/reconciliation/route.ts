@@ -9,21 +9,20 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/admin/trust/reconciliation
  *
- * Computes the full trust account reconciliation:
- *
  * Trust IN:
- *   + All COMPLETED deposits (bank transfers + Stripe)
+ *   + Investor deposits (bank transfers + Stripe)
+ *   + Asset sale proceeds recorded per distribution
  *
  * Trust OUT:
- *   - All COMPLETED withdrawals (paid back to investors)
- *   - Management fees charged from investor wallets (FEE transactions)
- *   - Unit purchases by investors (PURCHASE transactions — funds committed to deals)
- *   - Vendor disbursements recorded (trust → asset vendor, manual record)
- *   - Platform fee extractions recorded (trust → general account, manual record)
+ *   - Investor withdrawals
+ *   - Management fees charged from investor wallets
+ *   - Vendor payments (trust → asset vendor on investment close)
+ *   - Management fee sweeps (trust → general account, manual)
+ *   - Distribution profit share sweeps (trust → general account, per distribution)
  *
- * Expected trust balance = IN - OUT
- * Actual recorded balance = sum of all wallet balances
- * Discrepancy = Actual - Expected (should be $0)
+ * Expected balance = IN - OUT
+ * Actual balance   = sum of all investor wallet balances
+ * Discrepancy      = Actual - Expected (should be $0)
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -33,9 +32,10 @@ export async function GET() {
   const [
     depositAggregate,
     withdrawalAggregate,
-    feeAggregate,
-    feeExtractionAggregate,
+    mgmtFeeAggregate,
+    mgmtFeeSweepAggregate,
     feeExtractions,
+    distributions,
     disbursements,
     walletAggregate,
     pendingDisbursements,
@@ -48,18 +48,25 @@ export async function GET() {
       where: { status: 'COMPLETED' },
       _sum: { amount: true },
     }),
+    // Monthly management fees deducted from investor wallets
     prisma.transaction.aggregate({
-      where: { type: 'FEE', status: 'COMPLETED' },
+      where: { type: 'FEE', status: 'COMPLETED', investmentId: null },
       _sum: { amount: true },
     }),
-    // Total management fees already swept to general account
-    prisma.trustFeeExtraction.aggregate({
-      _sum: { amount: true },
-    }),
-    // All fee extraction records for action list
+    // Total management fee sweeps already transferred to general account
+    prisma.trustFeeExtraction.aggregate({ _sum: { amount: true } }),
+    // All fee sweep records for history
     prisma.trustFeeExtraction.findMany({
       include: { recordedBy: { select: { name: true } } },
       orderBy: { extractedAt: 'desc' },
+    }),
+    // All distributions with sale proceeds and profit share sweep status
+    prisma.distribution.findMany({
+      include: {
+        investment: { select: { id: true, title: true, status: true } },
+        profitShareSweptBy: { select: { name: true } },
+      },
+      orderBy: { distributedAt: 'desc' },
     }),
     prisma.trustDisbursement.findMany({
       include: {
@@ -68,9 +75,7 @@ export async function GET() {
       },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.wallet.aggregate({
-      _sum: { balance: true },
-    }),
+    prisma.wallet.aggregate({ _sum: { balance: true } }),
     prisma.investment.findMany({
       where: { status: 'CLOSED', trustDisbursement: null },
       select: { id: true, title: true },
@@ -79,49 +84,78 @@ export async function GET() {
 
   const totalDeposited = Number(depositAggregate._sum.amount ?? 0);
   const totalWithdrawn = Number(withdrawalAggregate._sum.amount ?? 0);
-  const totalFeesCharged = Number(feeAggregate._sum.amount ?? 0);
-  const totalMgmtFeesSwept = Number(feeExtractionAggregate._sum.amount ?? 0);
+  const totalMgmtFeesCharged = Number(mgmtFeeAggregate._sum.amount ?? 0);
+  const totalMgmtFeesSwept = Number(mgmtFeeSweepAggregate._sum.amount ?? 0);
+  const mgmtFeesAwaitingSweep = Math.max(0, totalMgmtFeesCharged - totalMgmtFeesSwept);
+
+  // Asset sale proceeds: recorded against each distribution
+  const totalSaleProceeds = distributions.reduce(
+    (sum, d) => sum + Number(d.saleProceeds ?? 0),
+    0
+  );
 
   const totalVendorDisbursed = disbursements
     .filter((d) => d.disbursedAt !== null)
     .reduce((sum, d) => sum + Number(d.vendorAmount ?? 0), 0);
 
-  const totalInvestmentFeesExtracted = disbursements
-    .filter((d) => d.platformFeeExtractedAt !== null)
-    .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
+  // Profit share swept from distributions to general account
+  const totalProfitShareSwept = distributions
+    .filter((d) => d.profitShareSweptAt !== null)
+    .reduce((sum, d) => sum + Number(d.profitShareDeducted), 0);
 
-  // Management fees sitting in trust but not yet swept to general account
-  const mgmtFeesAwaitingSweep = totalFeesCharged - totalMgmtFeesSwept;
-
-  const expectedBalance =
-    totalDeposited - totalWithdrawn - totalFeesCharged - totalVendorDisbursed - totalInvestmentFeesExtracted - totalMgmtFeesSwept;
-
-  const actualBalance = Number(walletAggregate._sum.balance ?? 0);
-  const discrepancy = actualBalance - expectedBalance;
+  // Profit share sitting in trust (distribution processed but not yet swept)
+  const profitShareAwaitingSweep = distributions
+    .filter((d) => d.profitShareSweptAt === null && Number(d.profitShareDeducted) > 0)
+    .reduce((sum, d) => sum + Number(d.profitShareDeducted), 0);
 
   const pendingVendorDisbursement = disbursements
     .filter((d) => d.disbursedAt === null)
     .reduce((sum, d) => sum + Number(d.totalRaised), 0);
 
-  const pendingInvestmentFeeExtraction = disbursements
-    .filter((d) => d.platformFeeAmount !== null && d.platformFeeExtractedAt === null)
-    .reduce((sum, d) => sum + Number(d.platformFeeAmount ?? 0), 0);
+  const expectedBalance =
+    totalDeposited +
+    totalSaleProceeds -
+    totalWithdrawn -
+    totalMgmtFeesCharged -
+    totalVendorDisbursed -
+    totalMgmtFeesSwept -
+    totalProfitShareSwept;
+
+  const actualBalance = Number(walletAggregate._sum.balance ?? 0);
+  const discrepancy = actualBalance - expectedBalance;
 
   return NextResponse.json({
     summary: {
       totalDeposited,
+      totalSaleProceeds,
       totalWithdrawn,
-      totalFeesCharged,
+      totalMgmtFeesCharged,
       totalMgmtFeesSwept,
       mgmtFeesAwaitingSweep,
       totalVendorDisbursed,
-      totalInvestmentFeesExtracted,
+      totalProfitShareSwept,
+      profitShareAwaitingSweep,
       expectedBalance,
       actualBalance,
       discrepancy,
       pendingVendorDisbursement,
-      pendingInvestmentFeeExtraction,
     },
+    distributions: distributions.map((d) => ({
+      id: d.id,
+      investmentId: d.investmentId,
+      investmentTitle: d.investment.title,
+      investmentStatus: d.investment.status,
+      totalAmount: Number(d.totalAmount),
+      profitShareDeducted: Number(d.profitShareDeducted),
+      netAmount: Number(d.netAmount),
+      distributedAt: d.distributedAt.toISOString(),
+      notes: d.notes,
+      saleProceeds: d.saleProceeds ? Number(d.saleProceeds) : null,
+      saleProceedsRef: d.saleProceedsRef,
+      profitShareSweptAt: d.profitShareSweptAt?.toISOString() ?? null,
+      profitShareSweptRef: d.profitShareSweptRef,
+      profitShareSweptBy: d.profitShareSweptBy?.name ?? null,
+    })),
     feeExtractions: feeExtractions.map((e) => ({
       id: e.id,
       amount: Number(e.amount),
@@ -140,9 +174,6 @@ export async function GET() {
       vendorAmount: d.vendorAmount ? Number(d.vendorAmount) : null,
       disbursedAt: d.disbursedAt?.toISOString() ?? null,
       disbursementRef: d.disbursementRef,
-      platformFeeAmount: d.platformFeeAmount ? Number(d.platformFeeAmount) : null,
-      platformFeeExtractedAt: d.platformFeeExtractedAt?.toISOString() ?? null,
-      feeRef: d.feeRef,
       notes: d.notes,
       recordedBy: d.recordedBy?.name ?? null,
       createdAt: d.createdAt.toISOString(),
