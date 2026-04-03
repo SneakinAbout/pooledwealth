@@ -11,7 +11,7 @@ export async function GET(_request: NextRequest) {
     if (authError) return authError;
 
     const holdings = await prisma.holding.findMany({
-      where: { userId: session!.user.id },
+      where: { userId: session!.user.id, soldAt: null },
       include: {
         investment: {
           select: {

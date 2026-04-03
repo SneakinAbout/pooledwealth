@@ -203,6 +203,9 @@ model Holding {
   // price snapshot. It is incremented on each subsequent purchase.
   purchasePrice  Decimal  @db.Decimal(18, 2)
   purchasedAt    DateTime @default(now())
+  // Set when the asset is sold via a distribution — holding stays for history
+  // but is excluded from active portfolio and future fee calculations.
+  soldAt         DateTime?
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)

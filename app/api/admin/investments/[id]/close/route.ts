@@ -74,6 +74,20 @@ export async function POST(
         data: { status: 'ARCHIVED' },
       });
 
+      // Pro-rate the management fee refund for the current month.
+      // Fees are charged on the 1st — if archiving mid-month, refund the
+      // unused portion (remaining days / days in month) for each investor's
+      // share of this investment.
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const dayOfMonth = now.getDate();
+      // Fraction of the month already used (1 = full month, 0 = no days elapsed)
+      const usedFraction = dayOfMonth / daysInMonth;
+      const refundFraction = 1 - usedFraction;
+
+      const settings = await tx.platformSettings.findFirst({ orderBy: { updatedAt: 'desc' } });
+      const annualPct = Number(settings?.managementFeePercent ?? 2);
+
       for (const holding of investment.holdings) {
         const refundAmount = Number(holding.purchasePrice);
 
@@ -84,6 +98,7 @@ export async function POST(
           data: { availableUnits: { increment: holding.unitsPurchased } },
         });
 
+        // Refund capital
         await tx.wallet.upsert({
           where: { userId: holding.userId },
           update: { balance: { increment: refundAmount } },
@@ -100,6 +115,27 @@ export async function POST(
             status: 'COMPLETED',
           },
         });
+
+        // Pro-rated fee refund for unused days this month (only if archiving after the 1st)
+        if (refundFraction > 0.01) {
+          const monthlyFee = Math.round((refundAmount * (annualPct / 100) / 12) * 100) / 100;
+          const feeRefund = Math.round(monthlyFee * refundFraction * 100) / 100;
+          if (feeRefund > 0) {
+            await tx.wallet.update({
+              where: { userId: holding.userId },
+              data: { balance: { increment: feeRefund } },
+            });
+            await tx.transaction.create({
+              data: {
+                userId: holding.userId,
+                investmentId: params.id,
+                type: 'FEE',
+                amount: -feeRefund, // negative = refund
+                status: 'COMPLETED',
+              },
+            });
+          }
+        }
       }
 
       return {

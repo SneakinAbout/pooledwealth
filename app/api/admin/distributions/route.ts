@@ -114,6 +114,11 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // If the investment is CLOSED (asset sold), mark all holdings as sold
+      // so they drop off investor portfolios and stop accruing management fees.
+      const isFinalDistribution = investment.status === 'CLOSED';
+      const soldAt = isFinalDistribution ? new Date() : null;
+
       let distributedNetCents = 0;
       let distributedGrossCents = 0;
       for (let i = 0; i < investment.holdings.length; i++) {
@@ -161,6 +166,14 @@ export async function POST(request: NextRequest) {
           update: { balance: { increment: holderNetCents / 100 } },
           create: { userId: holding.userId, balance: holderNetCents / 100 },
         });
+
+        // Mark holding as sold so it drops off the portfolio and stops accruing fees
+        if (soldAt) {
+          await tx.holding.update({
+            where: { id: holding.id },
+            data: { soldAt },
+          });
+        }
       }
 
       return [distribution];
