@@ -21,6 +21,7 @@ import {
   UserCog,
   Bookmark,
   ShieldCheck,
+  LineChart,
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -44,6 +45,7 @@ const navGroups: Record<string, NavGroup[]> = {
       items: [
         { label: 'Browse Assets', href: '/investments', icon: TrendingUp },
         { label: 'My Portfolio', href: '/investor/portfolio', icon: PieChart },
+        { label: 'Returns Report', href: '/investor/returns', icon: LineChart },
         { label: 'Watchlist', href: '/investor/watchlist', icon: Bookmark },
       ],
     },
@@ -59,6 +61,7 @@ const navGroups: Record<string, NavGroup[]> = {
       items: [
         { label: 'Browse Assets', href: '/investments', icon: TrendingUp },
         { label: 'My Portfolio', href: '/investor/portfolio', icon: PieChart },
+        { label: 'Returns Report', href: '/investor/returns', icon: LineChart },
         { label: 'Watchlist', href: '/investor/watchlist', icon: Bookmark },
       ],
     },
@@ -81,6 +84,7 @@ const navGroups: Record<string, NavGroup[]> = {
       items: [
         { label: 'Browse Assets', href: '/investments', icon: TrendingUp },
         { label: 'My Portfolio', href: '/investor/portfolio', icon: PieChart },
+        { label: 'Returns Report', href: '/investor/returns', icon: LineChart },
         { label: 'Watchlist', href: '/investor/watchlist', icon: Bookmark },
       ],
     },
