@@ -91,13 +91,6 @@ export async function POST(
         throw Object.assign(new Error('Subscription period for this investment has ended'), { status: 400 });
       }
 
-      if (units > freshInvestment.availableUnits) {
-        throw Object.assign(
-          new Error(`Only ${freshInvestment.availableUnits} units available`),
-          { status: 400 }
-        );
-      }
-
       const totalCost = Number(freshInvestment.pricePerUnit) * units;
       const wallet = await tx.wallet.findUnique({ where: { userId: session!.user.id } });
 
@@ -110,15 +103,26 @@ export async function POST(
         );
       }
 
-      await tx.wallet.update({
-        where: { id: wallet!.id },
+      // Atomically deduct wallet balance only if sufficient funds exist (prevents race condition)
+      const walletUpdated = await tx.wallet.updateMany({
+        where: { id: wallet!.id, balance: { gte: totalCost } },
         data: { balance: { decrement: totalCost } },
       });
+      if (walletUpdated.count === 0) {
+        throw Object.assign(new Error('Insufficient wallet balance'), { status: 400, insufficientFunds: true });
+      }
 
-      await tx.investment.update({
-        where: { id: params.id },
+      // Atomically decrement availableUnits only if enough remain (prevents oversell race condition)
+      const investmentUpdated = await tx.investment.updateMany({
+        where: { id: params.id, availableUnits: { gte: units } },
         data: { availableUnits: { decrement: units } },
       });
+      if (investmentUpdated.count === 0) {
+        throw Object.assign(
+          new Error(`Only ${freshInvestment.availableUnits} units available`),
+          { status: 400 }
+        );
+      }
 
       const existingHolding = await tx.holding.findFirst({
         where: { userId: session!.user.id, investmentId: params.id },

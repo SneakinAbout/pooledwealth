@@ -25,6 +25,7 @@ export const dynamic = 'force-dynamic';
  * Discrepancy      = Actual - Expected (should be $0)
  */
 export async function GET() {
+  try {
   const session = await getServerSession(authOptions);
   const permError = requireAdmin(session);
   if (permError) return permError;
@@ -190,4 +191,8 @@ export async function GET() {
     })),
     pendingSetup: pendingDisbursements,
   });
+  } catch (err) {
+    console.error('[GET /api/admin/trust/reconciliation]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

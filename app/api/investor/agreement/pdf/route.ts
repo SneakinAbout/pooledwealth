@@ -6,10 +6,11 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const agreement = await prisma.masterAgreement.findUnique({ where: { userId: session.user.id } });
+    const agreement = await prisma.masterAgreement.findUnique({ where: { userId: session.user.id } });
   if (!agreement) return NextResponse.json({ error: 'No signed agreement found' }, { status: 404 });
 
   const agreedAt = new Date(agreement.agreedAt).toLocaleString('en-AU', {
@@ -68,9 +69,13 @@ export async function GET() {
 </body>
 </html>`;
 
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  });
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+      },
+    });
+  } catch (err) {
+    console.error('[GET /api/investor/agreement/pdf]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

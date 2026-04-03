@@ -6,19 +6,24 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const agreement = await prisma.masterAgreement.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      id: true,
-      fullNameAtSigning: true,
-      agreedAt: true,
-      ipAddress: true,
-      agreementVersion: true,
-    },
-  });
+    const agreement = await prisma.masterAgreement.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        id: true,
+        fullNameAtSigning: true,
+        agreedAt: true,
+        ipAddress: true,
+        agreementVersion: true,
+      },
+    });
 
-  return NextResponse.json({ agreement: agreement ?? null });
+    return NextResponse.json({ agreement: agreement ?? null });
+  } catch (err) {
+    console.error('[GET /api/investor/agreement]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

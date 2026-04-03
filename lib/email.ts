@@ -20,6 +20,9 @@ const PLATFORM = 'Pooled Wealth';
 
 async function send(to: string, subject: string, html: string) {
   if (!process.env.SMTP_USER) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMTP_USER must be configured in production — email not sent');
+    }
     // No SMTP configured — log to console in dev
     console.log(`\n📧 EMAIL (not sent — SMTP not configured)\nTo: ${to}\nSubject: ${subject}\n${html.replace(/<[^>]+>/g, '')}\n`);
     return;

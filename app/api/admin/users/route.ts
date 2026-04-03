@@ -10,6 +10,10 @@ export async function GET(_request: NextRequest) {
     const permError = requireAdmin(session);
     if (permError) return permError;
 
+    const { searchParams } = new URL(_request.url);
+    const take = Math.min(parseInt(searchParams.get('limit') ?? '50'), 200);
+    const skip = parseInt(searchParams.get('offset') ?? '0');
+
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -23,6 +27,8 @@ export async function GET(_request: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
 
     return NextResponse.json(users);

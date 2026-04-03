@@ -9,15 +9,20 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  const permError = requireAdmin(session);
-  if (permError) return permError;
+  try {
+    const session = await getServerSession(authOptions);
+    const permError = requireAdmin(session);
+    if (permError) return permError;
 
-  const docs = await prisma.kycDocument.findMany({
-    where: { userId: params.id },
-    select: { id: true, type: true, fileName: true, mimeType: true, uploadedAt: true },
-    orderBy: { uploadedAt: 'desc' },
-  });
+    const docs = await prisma.kycDocument.findMany({
+      where: { userId: params.id },
+      select: { id: true, type: true, fileName: true, mimeType: true, uploadedAt: true },
+      orderBy: { uploadedAt: 'desc' },
+    });
 
-  return NextResponse.json(docs.map((d) => ({ ...d, uploadedAt: d.uploadedAt.toISOString() })));
+    return NextResponse.json(docs.map((d) => ({ ...d, uploadedAt: d.uploadedAt.toISOString() })));
+  } catch (err) {
+    console.error('[GET /api/admin/users/[id]/kyc-documents]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

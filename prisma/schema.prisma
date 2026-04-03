@@ -207,6 +207,7 @@ model Holding {
   user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
+  @@unique([userId, investmentId])
   @@index([userId])
   @@index([investmentId])
   @@map("holdings")

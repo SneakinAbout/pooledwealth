@@ -21,6 +21,9 @@ export async function GET(request: NextRequest) {
     if (type) where.type = type;
     if (status) where.status = status;
 
+    const take = Math.min(parseInt(searchParams.get('limit') ?? '100'), 500);
+    const skip = parseInt(searchParams.get('offset') ?? '0');
+
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
@@ -33,6 +36,8 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
 
     return NextResponse.json(transactions);

@@ -139,7 +139,7 @@ export default function TrustClient({
         const res = await fetch('/api/admin/trust/fee-extractions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: parseFloat(amount), extractedAt: new Date(date).toISOString(), bankRef: bankRef || undefined, notes: notes || undefined }),
+          body: JSON.stringify({ amount: parseFloat(amount), extractedAt: new Date().toISOString(), bankRef: bankRef || undefined, notes: notes || undefined }),
         });
         if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
         toast.success('Management fee sweep recorded');
@@ -256,8 +256,8 @@ export default function TrustClient({
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white">Trust Account</h1>
-        <p className="text-gray-400 mt-1 text-sm">
+        <h1 className="text-2xl font-bold text-gray-900">Trust Account</h1>
+        <p className="text-gray-600 mt-1 text-sm">
           Track all capital flows into and out of trust — vendor payments, sale proceeds, profit share, and live reconciliation.
         </p>
       </div>
