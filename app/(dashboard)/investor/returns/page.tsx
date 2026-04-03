@@ -10,7 +10,7 @@ export default async function ReturnsPage() {
   if (!session) redirect('/login');
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[#1A1207] mb-1">Returns Report</h1>
         <p className="text-[#6A5A40]">Review your investment performance over any date range</p>
