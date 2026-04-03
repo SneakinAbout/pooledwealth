@@ -68,10 +68,10 @@ export async function POST(
         return { outcome: 'closed', totalRaised, minimumMet: true, refundedCount: 0 };
       }
 
-      // Failed raise — archive and refund all investors
+      // Failed raise — mark as FAILED and refund all investors
       await tx.investment.update({
         where: { id: params.id },
-        data: { status: 'ARCHIVED' },
+        data: { status: 'FAILED' },
       });
 
       for (const holding of investment.holdings) {

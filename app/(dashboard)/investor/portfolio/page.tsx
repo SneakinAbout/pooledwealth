@@ -55,8 +55,8 @@ export default async function PortfolioPage() {
 
   // Active holdings = investment still open or closed (not yet distributed/exited)
   // Archived = investment completed, distributions done — exclude from live totals
-  const activeHoldings = holdings.filter((h) => h.investment.status !== 'ARCHIVED');
-  const completedHoldings = holdings.filter((h) => h.investment.status === 'ARCHIVED');
+  const activeHoldings = holdings.filter((h) => !['EXITED', 'FAILED', 'ARCHIVED'].includes(h.investment.status));
+  const completedHoldings = holdings.filter((h) => ['EXITED', 'FAILED'].includes(h.investment.status));
 
   const totalInvested = activeHoldings.reduce((sum, h) => sum + Number(h.purchasePrice), 0);
   const currentValue = activeHoldings.reduce(

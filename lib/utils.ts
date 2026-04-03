@@ -34,6 +34,10 @@ export function getStatusColor(status: string): string {
       return 'text-yellow-400 bg-yellow-400/10';
     case 'CLOSED':
       return 'text-blue-400 bg-blue-400/10';
+    case 'EXITED':
+      return 'text-purple-400 bg-purple-400/10';
+    case 'FAILED':
+      return 'text-red-400 bg-red-400/10';
     case 'ARCHIVED':
       return 'text-gray-400 bg-gray-400/10';
     case 'COMPLETED':

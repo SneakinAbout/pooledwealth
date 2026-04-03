@@ -27,7 +27,8 @@ export default async function InvestmentsPage({ searchParams }: { searchParams: 
     if (!agreement) redirect('/investor/agreement');
   }
 
-  // Active investments filter (non-ARCHIVED shown to all; ARCHIVED only to admin/manager)
+  // Active investments: exclude hard-archived (admin soft-delete) records.
+  // Admins/managers see DRAFT/ACTIVE/CLOSED/EXITED/FAILED; investors only see ACTIVE.
   const activeWhere: Record<string, unknown> = { status: { not: 'ARCHIVED' } };
   if (!isAdmin && !isManager) activeWhere.status = 'ACTIVE';
   if (searchParams.category && searchParams.category !== 'All') activeWhere.category = searchParams.category;
@@ -38,8 +39,8 @@ export default async function InvestmentsPage({ searchParams }: { searchParams: 
     ];
   }
 
-  // Archived investments — always shown (public can see completed assets)
-  const archivedWhere: Record<string, unknown> = { status: 'ARCHIVED' };
+  // Exited investments — fully completed lifecycle (raised → held → sold → distributed)
+  const archivedWhere: Record<string, unknown> = { status: 'EXITED' };
   if (searchParams.category && searchParams.category !== 'All') archivedWhere.category = searchParams.category;
   if (searchParams.search) {
     archivedWhere.OR = [

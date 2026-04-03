@@ -18,6 +18,8 @@ enum InvestmentStatus {
   DRAFT
   ACTIVE
   CLOSED
+  EXITED
+  FAILED
   ARCHIVED
 }
 

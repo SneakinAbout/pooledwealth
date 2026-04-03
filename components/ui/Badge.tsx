@@ -28,10 +28,11 @@ export function StatusBadge({ status }: { status: string }) {
     ACTIVE:    { label: 'Active',     variant: 'success' },
     DRAFT:     { label: 'Draft',      variant: 'warning' },
     CLOSED:    { label: 'Closed',     variant: 'info' },
+    EXITED:    { label: 'Exited',     variant: 'default' },
+    FAILED:    { label: 'Failed',     variant: 'danger' },
     ARCHIVED:  { label: 'Archived',   variant: 'default' },
     COMPLETED: { label: 'Completed',  variant: 'default' },
     PENDING:   { label: 'Pending',    variant: 'warning' },
-    FAILED:    { label: 'Failed',     variant: 'danger' },
   };
 
   const config = map[status] ?? { label: status, variant: 'default' as const };

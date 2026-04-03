@@ -90,7 +90,7 @@ export default async function AdminInvestmentsPage() {
                   <Link href={`/manager/investments/${inv.id}/edit`}>
                     <Button variant="secondary" size="sm">Edit</Button>
                   </Link>
-                  {inv.status !== 'ARCHIVED' && (
+                  {!['ARCHIVED', 'EXITED', 'FAILED'].includes(inv.status) && (
                     <AdminInvestmentActions investmentId={inv.id} status={inv.status} />
                   )}
                 </div>

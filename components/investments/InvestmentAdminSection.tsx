@@ -244,7 +244,7 @@ export default function InvestmentAdminSection({
               Refund &amp; Re-list
             </Button>
           )}
-          {availableUnits === 0 && status !== 'ARCHIVED' && (
+          {availableUnits === 0 && !['ARCHIVED', 'EXITED', 'FAILED'].includes(status) && (
             <Button
               variant="secondary"
               size="sm"
@@ -255,7 +255,7 @@ export default function InvestmentAdminSection({
               {locked ? <><Unlock className="h-3 w-3" /> Unlock</> : <><Lock className="h-3 w-3" /> Lock</>}
             </Button>
           )}
-          {availableUnits > 0 && status !== 'ARCHIVED' && (
+          {availableUnits > 0 && !['ARCHIVED', 'EXITED', 'FAILED'].includes(status) && (
             <Button variant="secondary" size="sm" onClick={() => setShowAutoAllocate(true)} disabled={statusLoading}>
               Auto-allocate Remaining
             </Button>

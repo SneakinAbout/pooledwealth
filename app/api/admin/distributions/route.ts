@@ -114,8 +114,8 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // If the investment is CLOSED (asset sold), mark all holdings as sold
-      // so they drop off investor portfolios and stop accruing management fees.
+      // If the investment is CLOSED (asset sold), this is the final distribution.
+      // Mark all holdings as sold and transition investment to EXITED.
       const isFinalDistribution = investment.status === 'CLOSED';
       const soldAt = isFinalDistribution ? new Date() : null;
 
@@ -174,6 +174,14 @@ export async function POST(request: NextRequest) {
             data: { soldAt },
           });
         }
+      }
+
+      // Transition investment to EXITED once all holdings are marked sold
+      if (isFinalDistribution) {
+        await tx.investment.update({
+          where: { id: investmentId },
+          data: { status: 'EXITED' },
+        });
       }
 
       return [distribution];

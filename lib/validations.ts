@@ -21,7 +21,7 @@ export const investmentSchemaBase = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
   description: z.string().min(20, 'Description must be at least 20 characters').max(5000),
   category: z.enum(['Pokemon TCG', 'Sports Cards', 'Sneakers', 'Comics', 'Watches', 'Memorabilia']),
-  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED', 'ARCHIVED']).optional(),
+  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED', 'EXITED', 'FAILED', 'ARCHIVED']).optional(),
   totalUnits: z.number().int().positive('Total units must be positive'),
   pricePerUnit: z.number().positive('Price per unit must be positive'),
   minimumUnits: z.number().int().positive('Minimum units must be positive'),
