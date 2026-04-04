@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
     // Format investments for the email template
     const fmt = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
-    const dateFmt = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    const dateFmt = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Australia/Sydney' });
 
     const digestInvestments: DigestInvestment[] = investments.map((inv) => ({
       id: inv.id,
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     // Today's date for the email subject/header
     const today = new Intl.DateTimeFormat('en-AU', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney',
     }).format(new Date());
 
     // Find all users with notifications enabled (any role)
