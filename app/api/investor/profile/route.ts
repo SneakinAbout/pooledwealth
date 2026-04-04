@@ -20,6 +20,7 @@ const ProfileSchema = z.object({
   bankAccountNumber: z.string().max(20).optional().nullable(),
   bio: z.string().max(1000).optional().nullable(),
   linkedinUrl: z.string().url().optional().nullable(),
+  notifyNewInvestments: z.boolean().optional(),
 });
 
 // GET /api/investor/profile
@@ -48,6 +49,7 @@ export async function GET(_req: NextRequest) {
         bankAccountNumber: true,
         bio: true,
         linkedinUrl: true,
+        notifyNewInvestments: true,
       },
     });
 

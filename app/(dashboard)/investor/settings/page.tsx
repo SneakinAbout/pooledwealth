@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { User, MapPin, Shield, Phone, Calendar, ChevronDown, Landmark, Lock, Briefcase } from 'lucide-react';
+import { User, MapPin, Shield, Phone, Calendar, ChevronDown, Landmark, Lock, Briefcase, Bell } from 'lucide-react';
 import MyDocuments from '@/components/investor/MyDocuments';
 import { Card } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -30,6 +30,7 @@ interface Profile {
   hasBankAccount: boolean;
   bio: string;
   linkedinUrl: string;
+  notifyNewInvestments: boolean;
 }
 
 export default function InvestorSettingsPage() {
@@ -49,6 +50,7 @@ export default function InvestorSettingsPage() {
   const [bankDirty, setBankDirty] = useState(false);
   const [bio, setBio] = useState('');
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [notifications, setNotifications] = useState({ notifyNewInvestments: true });
 
   useEffect(() => {
     fetch('/api/investor/profile')
@@ -67,6 +69,7 @@ export default function InvestorSettingsPage() {
           postcode: data.postcode ?? '',
         });
         setBio(data.bio ?? '');
+        setNotifications({ notifyNewInvestments: data.notifyNewInvestments ?? true });
         setLoading(false);
         setBankDirty(false);
       });
@@ -485,6 +488,52 @@ export default function InvestorSettingsPage() {
           </div>
         </Card>
       )}
+
+      {/* Notifications */}
+      <Card>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-7 w-7 rounded-lg bg-[#1A2B1F] flex items-center justify-center">
+            <Bell className="h-3.5 w-3.5 text-[#C9A84C]" />
+          </div>
+          <h2 className="text-sm font-bold text-[#1A1207]">Email Notifications</h2>
+        </div>
+        <p className="text-xs text-[#8A7A60] mb-5">
+          Choose which emails you receive from Pooled Wealth. Transactional emails (deposits, withdrawals, distributions) are always sent.
+        </p>
+
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="relative mt-0.5">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={notifications.notifyNewInvestments}
+                onChange={(e) => setNotifications((n) => ({ ...n, notifyNewInvestments: e.target.checked }))}
+              />
+              <div className={`w-10 h-5 rounded-full transition-colors ${notifications.notifyNewInvestments ? 'bg-[#1A2B1F]' : 'bg-[#C8BEA8]'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${notifications.notifyNewInvestments ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#1A1207]">Daily New Investment Digest</p>
+              <p className="text-xs text-[#8A7A60] mt-0.5">
+                Receive a morning email summary of new investment opportunities listed that day. Sent at 8am AEST when new opportunities are available.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => save('notifications', notifications as unknown as Record<string, string | null>)}
+            disabled={saving === 'notifications'}
+            loading={saving === 'notifications'}
+          >
+            Save Preferences
+          </Button>
+        </div>
+      </Card>
 
       {/* Change Password */}
       <Card>

@@ -13,6 +13,7 @@ import DistributionReceived from '../emails/templates/distribution-received';
 import SupplementFinalised from '../emails/templates/supplement-finalised';
 import InvestmentUpdate from '../emails/templates/investment-update';
 import ProposalVoteOpened from '../emails/templates/proposal-vote-opened';
+import NewInvestmentsDigest, { type DigestInvestment } from '../emails/templates/new-investments-digest';
 
 const FROM = process.env.EMAIL_FROM || 'Pooled Wealth <noreply@pooledwealth.com>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -86,3 +87,18 @@ export async function sendProposalVoteOpened(to: string, name: string, investmen
   const html = await render(ProposalVoteOpened({ name, investmentTitle, investmentId }));
   await send(to, `Vote opened: ${investmentTitle}`, html);
 }
+
+export async function sendNewInvestmentsDigest(
+  to: string,
+  name: string,
+  investments: DigestInvestment[],
+  date: string,
+) {
+  const html = await render(NewInvestmentsDigest({ name, investments, date }));
+  const subject = investments.length === 1
+    ? `1 new investment available on Pooled Wealth`
+    : `${investments.length} new investments available on Pooled Wealth`;
+  await send(to, subject, html);
+}
+
+export type { DigestInvestment };
