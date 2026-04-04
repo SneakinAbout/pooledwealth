@@ -1,33 +1,27 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: process.env.SMTP_USER
-    ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    : undefined,
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM = process.env.SMTP_FROM || 'noreply@pooledwealth.com';
+const FROM = process.env.EMAIL_FROM || 'Pooled Wealth <noreply@pooledwealth.com>';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const PLATFORM = 'Pooled Wealth';
 
 /** Escape user-supplied strings before embedding in HTML email templates */
 function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const PLATFORM = 'Pooled Wealth';
 
 async function send(to: string, subject: string, html: string) {
-  if (!process.env.SMTP_USER) {
+  if (!process.env.RESEND_API_KEY) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('SMTP_USER must be configured in production — email not sent');
+      throw new Error('RESEND_API_KEY must be configured in production — email not sent');
     }
-    // No SMTP configured — log to console in dev
-    console.log(`\n📧 EMAIL (not sent — SMTP not configured)\nTo: ${to}\nSubject: ${subject}\n${html.replace(/<[^>]+>/g, '')}\n`);
+    // No API key — log to console in dev
+    console.log(`\n📧 EMAIL (not sent — RESEND_API_KEY not configured)\nTo: ${to}\nSubject: ${subject}\n${html.replace(/<[^>]+>/g, '')}\n`);
     return;
   }
-  await transporter.sendMail({ from: `${PLATFORM} <${FROM}>`, to, subject, html });
+  const { error } = await resend.emails.send({ from: FROM, to, subject, html });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }
 
 function base(body: string) {
