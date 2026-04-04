@@ -1,7 +1,5 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM = process.env.EMAIL_FROM || 'Pooled Wealth <noreply@pooledwealth.com>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const PLATFORM = 'Pooled Wealth';
@@ -20,6 +18,7 @@ async function send(to: string, subject: string, html: string) {
     console.log(`\n📧 EMAIL (not sent — RESEND_API_KEY not configured)\nTo: ${to}\nSubject: ${subject}\n${html.replace(/<[^>]+>/g, '')}\n`);
     return;
   }
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { error } = await resend.emails.send({ from: FROM, to, subject, html });
   if (error) throw new Error(`Resend error: ${error.message}`);
 }
