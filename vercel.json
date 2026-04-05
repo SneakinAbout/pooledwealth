@@ -1,21 +1,3 @@
 {
-  "regions": ["sin1"],
-  "crons": [
-    {
-      "path": "/api/cron/charge-fees",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/investments",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/proposals",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/digest",
-      "schedule": "0 22 * * *"
-    }
-  ]
+  "regions": ["sin1"]
 }
