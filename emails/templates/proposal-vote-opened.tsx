@@ -1,8 +1,6 @@
 import { Section, Text } from '@react-email/components';
 import * as React from 'react';
-import { Base, CtaButton, Divider, S, C } from '../base';
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pooledwealth.com';
+import { Base, CtaButton, Divider, SectionHeading, InfoTable, S, C, APP_URL } from '../base';
 
 interface Props {
   name: string;
@@ -12,57 +10,57 @@ interface Props {
 
 export default function ProposalVoteOpened({ name, investmentTitle, investmentId }: Props) {
   return (
-    <Base preview={`Your vote is required: a governance proposal is open for ${investmentTitle}`}>
-      <Text style={S.greeting}>Dear {name},</Text>
+    <Base preview={`Action required: A governance vote is open for ${investmentTitle}`}>
+      <Text style={S.eyebrow}>Governance · Action Required</Text>
+      <SectionHeading title="Your vote is now open" />
+
+      <Section style={{ marginBottom: '24px' }}>
+        <Text style={S.badgeWarning}>Vote Open</Text>
+      </Section>
+
+      <Text style={S.body_text}>Dear {name},</Text>
+      <Text style={S.body_text}>
+        A governance proposal has been raised for one of your co-owned assets.
+        As a registered co-owner, you are entitled — and encouraged — to cast
+        your vote before the closing date.
+      </Text>
+
+      <InfoTable rows={[
+        ['Investment', investmentTitle],
+        ['Vote Status', 'Open — awaiting your response', C.amber],
+        ['Your Role', 'Co-owner (voting rights apply)'],
+      ]} />
 
       <Section style={{
         backgroundColor: C.navy,
-        padding: '20px 28px',
         borderRadius: '2px',
-        margin: '0 0 24px',
-        borderLeft: `4px solid ${C.gold}`,
+        padding: '20px 24px',
+        margin: '0 0 28px',
       }}>
-        <Text style={{ ...S.amountLabel, color: C.goldLight, margin: '0 0 4px' }}>
-          Action Required
+        <Text style={{ ...S.note, color: C.goldLight, margin: '0 0 6px' }}>
+          Important
         </Text>
-        <Text style={{ ...S.amount, color: C.white, fontSize: '16px' }}>
-          Governance Proposal — Vote Now Open
+        <Text style={{ ...S.note, color: C.creamDark, margin: '0', lineHeight: '1.7' }}>
+          Votes are binding and cannot be changed once submitted. Please review
+          the full proposal before casting your vote.
         </Text>
       </Section>
 
-      <Text style={S.paragraph}>
-        A governance proposal has been raised for one of your co-owned assets.
-        As a registered co-owner, your vote carries weight in this decision.
-      </Text>
-
-      {/* Investment name */}
-      <Section style={{
-        backgroundColor: C.cream,
-        border: `1px solid ${C.creamDark}`,
-        padding: '14px 20px',
-        borderRadius: '2px',
-        margin: '0 0 24px',
-      }}>
-        <Text style={{ ...S.amountLabel, margin: '0 0 4px' }}>Investment</Text>
-        <Text style={{ ...S.paragraph, margin: '0', color: C.ink, fontSize: '16px' }}>
-          {investmentTitle}
-        </Text>
-      </Section>
-
-      <Text style={S.paragraph}>
+      <Text style={S.body_text}>
         Review the proposal details, consider the implications for your investment,
-        and cast your vote before the closing date. Votes are binding and cannot be
-        changed once submitted.
+        and cast your vote directly from the investment page.
       </Text>
 
-      <CtaButton href={`${APP_URL}/investments/${investmentId}`}>View Proposal & Vote</CtaButton>
+      <CtaButton href={`${APP_URL}/investments/${investmentId}`}>
+        View Proposal &amp; Vote
+      </CtaButton>
 
-      <Divider gold />
+      <Divider />
 
-      <Text style={{ ...S.paragraph, fontSize: '13px', color: C.inkLight }}>
+      <Text style={S.note}>
         You are receiving this notification because you hold a co-ownership position
-        in <strong>{investmentTitle}</strong>. Your participation in governance decisions
-        ensures fair representation of all co-owners.
+        in <strong>{investmentTitle}</strong>. Your participation ensures fair
+        representation of all co-owners.
       </Text>
     </Base>
   );

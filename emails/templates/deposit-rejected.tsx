@@ -1,51 +1,59 @@
 import { Section, Text } from '@react-email/components';
 import * as React from 'react';
-import { Base, Divider, S, C } from '../base';
+import { Base, Divider, SectionHeading, S, C } from '../base';
 
-interface Props {
-  name: string;
-  amount: string;
-}
+interface Props { name: string; amount: string; }
 
 export default function DepositRejected({ name, amount }: Props) {
   return (
     <Base preview={`Your deposit of ${amount} could not be processed`}>
-      <Text style={S.greeting}>Dear {name},</Text>
+      <Text style={S.eyebrow}>Wallet</Text>
+      <SectionHeading title="Deposit unsuccessful" />
 
-      <Section style={{ margin: '0 0 24px' }}>
-        <Text style={S.badgeError}>Deposit Unsuccessful</Text>
+      <Section style={{ marginBottom: '24px' }}>
+        <Text style={S.badgeError}>Unable to Process</Text>
       </Section>
 
-      <Text style={S.paragraph}>
+      <Text style={S.body_text}>Dear {name},</Text>
+      <Text style={S.body_text}>
         Unfortunately, we were unable to approve your recent bank transfer deposit
-        of <strong>{amount}</strong>.
+        of <strong>{amount}</strong>. No funds have been credited to your wallet.
       </Text>
 
-      <Text style={{
-        ...S.paragraph,
-        backgroundColor: '#FDF0F0',
-        border: '1px solid #E8C8C8',
+      <Section style={{
+        backgroundColor: C.redBg,
+        border: `1px solid rgba(155,44,44,0.15)`,
         borderLeft: `3px solid ${C.red}`,
-        padding: '16px 20px',
+        padding: '18px 20px',
+        margin: '0 0 24px',
         borderRadius: '0 2px 2px 0',
       }}>
-        Your deposit of <strong>{amount}</strong> could not be processed at this time.
-        Please ensure your transfer details match our bank account information exactly.
+        <Text style={{ ...S.calloutText, color: C.red, margin: '0 0 10px', fontWeight: '600' }}>
+          Deposit of {amount} — Not Approved
+        </Text>
+        <Text style={{ ...S.note, color: C.red, margin: '0' }}>
+          Please review the details below and resubmit if required.
+        </Text>
+      </Section>
+
+      <Text style={{ ...S.body_text, margin: '0 0 10px' }}>
+        Common reasons for an unsuccessful deposit:
+      </Text>
+      <Text style={{ ...S.note, color: C.inkMid, margin: '0 0 6px', paddingLeft: '16px' }}>
+        · Incorrect or missing payment reference
+      </Text>
+      <Text style={{ ...S.note, color: C.inkMid, margin: '0 0 6px', paddingLeft: '16px' }}>
+        · Transfer sent from an unrecognised account
+      </Text>
+      <Text style={{ ...S.note, color: C.inkMid, margin: '0 0 28px', paddingLeft: '16px' }}>
+        · Amount does not match a pending deposit request
       </Text>
 
-      <Text style={S.paragraph}>
-        Common reasons for an unsuccessful deposit include:
-      </Text>
+      <Divider />
 
-      <Text style={{ ...S.paragraph, margin: '0 0 8px', paddingLeft: '16px' }}>· Incorrect reference number on the transfer</Text>
-      <Text style={{ ...S.paragraph, margin: '0 0 8px', paddingLeft: '16px' }}>· Transfer details do not match your account</Text>
-      <Text style={{ ...S.paragraph, margin: '0 0 24px', paddingLeft: '16px' }}>· Amount does not match a pending deposit request</Text>
-
-      <Divider gold />
-
-      <Text style={S.paragraph}>
-        Please contact our support team if you believe this is an error or require
-        assistance resubmitting your deposit.
+      <Text style={S.note}>
+        Please contact our support team if you believe this is an error or if
+        you require assistance resubmitting your deposit.
       </Text>
     </Base>
   );

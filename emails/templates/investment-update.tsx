@@ -1,8 +1,6 @@
 import { Section, Text } from '@react-email/components';
 import * as React from 'react';
-import { Base, CtaButton, Divider, S, C } from '../base';
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pooledwealth.com';
+import { Base, CtaButton, Divider, SectionHeading, S, C, APP_URL } from '../base';
 
 interface Props {
   name: string;
@@ -14,10 +12,12 @@ interface Props {
 export default function InvestmentUpdate({ name, investmentTitle, updateTitle, investmentId }: Props) {
   return (
     <Base preview={`New update on ${investmentTitle}: ${updateTitle}`}>
-      <Text style={S.greeting}>Dear {name},</Text>
+      <Text style={S.eyebrow}>Investment Update</Text>
+      <SectionHeading title="A new update has been posted" />
 
-      <Text style={S.paragraph}>
-        A new update has been posted for one of your investments.
+      <Text style={S.body_text}>Dear {name},</Text>
+      <Text style={S.body_text}>
+        The management team has posted a new update for one of your investments.
       </Text>
 
       {/* Investment name */}
@@ -25,40 +25,47 @@ export default function InvestmentUpdate({ name, investmentTitle, updateTitle, i
         backgroundColor: C.cream,
         border: `1px solid ${C.creamDark}`,
         padding: '14px 20px',
+        margin: '0 0 12px',
         borderRadius: '2px',
-        margin: '0 0 16px',
       }}>
-        <Text style={{ ...S.amountLabel, margin: '0 0 4px' }}>Investment</Text>
-        <Text style={{ ...S.paragraph, margin: '0', color: C.inkMid }}>
+        <Text style={{ ...S.note, margin: '0 0 4px', color: C.inkLight }}>Investment</Text>
+        <Text style={{ ...S.body_text, margin: '0', color: C.inkMid, fontSize: '14px' }}>
           {investmentTitle}
         </Text>
       </Section>
 
-      {/* Update title */}
+      {/* Update title — the hero callout */}
       <Section style={{
-        backgroundColor: C.white,
-        border: `1px solid ${C.creamDark}`,
-        borderLeft: `4px solid ${C.gold}`,
-        padding: '18px 20px',
-        borderRadius: '0 2px 2px 0',
-        margin: '0 0 24px',
+        backgroundColor: C.navy,
+        borderRadius: '2px',
+        padding: '24px 24px',
+        margin: '0 0 28px',
       }}>
-        <Text style={{ ...S.amountLabel, margin: '0 0 6px' }}>Latest Update</Text>
-        <Text style={{ ...S.greeting, margin: '0', fontSize: '17px' }}>
+        <Text style={{ ...S.note, color: C.goldLight, margin: '0 0 8px', letterSpacing: '0.18em' }}>
+          Latest Update
+        </Text>
+        <Text style={{
+          color: C.white,
+          fontSize: '18px',
+          fontFamily: '"Georgia", "Times New Roman", serif',
+          lineHeight: '1.4',
+          margin: '0',
+          fontWeight: '400',
+        }}>
           {updateTitle}
         </Text>
       </Section>
 
-      <Text style={S.paragraph}>
-        Log in to your account to read the full update and view any attachments
-        or additional information provided by the management team.
+      <Text style={S.body_text}>
+        Log in to your account to read the full update, view any attached
+        documents, and stay informed about your investment.
       </Text>
 
-      <CtaButton href={`${APP_URL}/investments/${investmentId}`}>View Update</CtaButton>
+      <CtaButton href={`${APP_URL}/investments/${investmentId}`}>Read Full Update</CtaButton>
 
-      <Divider gold />
+      <Divider />
 
-      <Text style={{ ...S.paragraph, fontSize: '13px', color: C.inkLight }}>
+      <Text style={S.note}>
         You are receiving this notification because you hold a position in{' '}
         <strong>{investmentTitle}</strong>. To manage your notification preferences,
         visit your account settings.
