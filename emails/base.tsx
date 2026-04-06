@@ -5,7 +5,6 @@ import {
   Head,
   Hr,
   Html,
-  Img,
   Link,
   Preview,
   Row,
@@ -260,6 +259,18 @@ export function Base({ preview, children }: BaseProps) {
           fallbackFontFamily="serif"
           webFont={undefined}
         />
+        <style>{`
+          @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; }
+            .email-body { padding: 20px 20px 24px !important; }
+            .email-header { padding: 20px !important; }
+            .stat-cell { display: block !important; width: 100% !important; padding: 6px 0 !important; }
+            .stat-row { display: block !important; width: 100% !important; }
+            .btn-full { width: 100% !important; text-align: center !important; box-sizing: border-box !important; }
+            .card-body { padding: 16px !important; }
+            .amount-block { padding: 16px !important; }
+          }
+        `}</style>
       </Head>
       <Preview>{preview}</Preview>
       <Body style={S.body}>
@@ -282,7 +293,7 @@ export function Base({ preview, children }: BaseProps) {
             </Section>
 
             {/* Email body */}
-            <Section style={S.body_inner}>
+            <Section style={S.body_inner} className="email-body">
               {children}
             </Section>
 

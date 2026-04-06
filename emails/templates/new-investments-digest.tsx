@@ -1,4 +1,4 @@
-import { Section, Text, Link, Row, Column } from '@react-email/components';
+import { Section, Text, Link } from '@react-email/components';
 import * as React from 'react';
 import { Base, CtaButton, Divider, S, C } from '../base';
 
@@ -8,18 +8,49 @@ export interface DigestInvestment {
   id: string;
   title: string;
   category: string;
-  pricePerUnit: string;   // formatted, e.g. "$500.00"
+  pricePerUnit: string;
   totalUnits: number;
   availableUnits: number;
-  targetReturn: string;   // formatted, e.g. "12.50"
-  endDate: string;        // formatted, e.g. "30 Jun 2026"
+  targetReturn: string;
+  endDate: string;
   imageUrl?: string | null;
 }
 
 interface Props {
   name: string;
   investments: DigestInvestment[];
-  date: string; // e.g. "Saturday, 5 April 2026"
+  date: string;
+}
+
+function StatRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <tr>
+      <td style={{
+        padding: '10px 12px',
+        borderBottom: `1px solid ${C.creamDark}`,
+        width: '45%',
+        fontFamily: '"Arial", sans-serif',
+        fontSize: '11px',
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: C.inkLight,
+        verticalAlign: 'middle',
+      }}>
+        {label}
+      </td>
+      <td style={{
+        padding: '10px 12px',
+        borderBottom: `1px solid ${C.creamDark}`,
+        fontFamily: '"Georgia", "Times New Roman", serif',
+        fontSize: '15px',
+        color: valueColor ?? C.ink,
+        fontWeight: '600',
+        verticalAlign: 'middle',
+      }}>
+        {value}
+      </td>
+    </tr>
+  );
 }
 
 export default function NewInvestmentsDigest({ name, investments, date }: Props) {
@@ -37,19 +68,18 @@ export default function NewInvestmentsDigest({ name, investments, date }: Props)
 
       <Divider gold />
 
-      {/* Investment cards */}
-      {investments.map((inv, i) => (
+      {investments.map((inv) => (
         <Section key={inv.id} style={{
-          backgroundColor: i % 2 === 0 ? C.cream : C.white,
+          backgroundColor: C.white,
           border: `1px solid ${C.creamDark}`,
           borderRadius: '2px',
-          marginBottom: '12px',
+          marginBottom: '16px',
           overflow: 'hidden',
         }}>
           {/* Category bar */}
           <Section style={{
             backgroundColor: C.navy,
-            padding: '8px 20px',
+            padding: '10px 16px',
           }}>
             <Text style={{
               ...S.amountLabel,
@@ -61,56 +91,52 @@ export default function NewInvestmentsDigest({ name, investments, date }: Props)
             </Text>
           </Section>
 
-          {/* Card body */}
-          <Section style={{ padding: '16px 20px' }}>
+          {/* Title */}
+          <Section style={{ padding: '16px 16px 0' }}>
             <Text style={{
               ...S.greeting,
-              fontSize: '17px',
-              margin: '0 0 12px',
+              fontSize: '18px',
+              margin: '0',
+              lineHeight: '1.3',
             }}>
               {inv.title}
             </Text>
+          </Section>
 
-            {/* Stats row */}
-            <Row>
-              <Column style={{ width: '33%', paddingRight: '8px' }}>
-                <Text style={{ ...S.amountLabel, margin: '0 0 3px' }}>Price / Unit</Text>
-                <Text style={{ ...S.paragraph, margin: '0', color: C.ink, fontWeight: '600' }}>
-                  {inv.pricePerUnit}
-                </Text>
-              </Column>
-              <Column style={{ width: '33%', paddingRight: '8px' }}>
-                <Text style={{ ...S.amountLabel, margin: '0 0 3px' }}>Target Return</Text>
-                <Text style={{ ...S.paragraph, margin: '0', color: C.green, fontWeight: '600' }}>
-                  {inv.targetReturn}% p.a.
-                </Text>
-              </Column>
-              <Column style={{ width: '33%' }}>
-                <Text style={{ ...S.amountLabel, margin: '0 0 3px' }}>Units Available</Text>
-                <Text style={{ ...S.paragraph, margin: '0', color: C.ink }}>
-                  {inv.availableUnits} of {inv.totalUnits}
-                </Text>
-              </Column>
-            </Row>
+          {/* Stats table — stacks naturally on mobile */}
+          <Section style={{ padding: '12px 16px 0' }}>
+            <table width="100%" cellPadding={0} cellSpacing={0} style={{
+              borderCollapse: 'collapse',
+              backgroundColor: C.cream,
+              borderRadius: '2px',
+              overflow: 'hidden',
+              border: `1px solid ${C.creamDark}`,
+            }}>
+              <tbody>
+                <StatRow label="Price per Unit" value={inv.pricePerUnit} />
+                <StatRow label="Target Return" value={`${inv.targetReturn}% p.a.`} valueColor={C.green} />
+                <StatRow label="Units Available" value={`${inv.availableUnits} of ${inv.totalUnits}`} />
+                <StatRow label="Closing Date" value={inv.endDate} />
+              </tbody>
+            </table>
+          </Section>
 
-            {/* Closing date + CTA */}
-            <Section style={{ marginTop: '16px' }}>
-              <Text style={{ ...S.note, margin: '0 0 12px', display: 'inline-block' }}>
-                Closes: <strong style={{ color: C.inkMid }}>{inv.endDate}</strong>
-              </Text>
-              <Section style={{ textAlign: 'left' }}>
-                <Link
-                  href={`${APP_URL}/investments/${inv.id}`}
-                  style={{
-                    ...S.btn,
-                    fontSize: '11px',
-                    padding: '10px 24px',
-                  }}
-                >
-                  View Opportunity →
-                </Link>
-              </Section>
-            </Section>
+          {/* CTA */}
+          <Section style={{ padding: '16px' }}>
+            <Link
+              href={`${APP_URL}/investments/${inv.id}`}
+              style={{
+                ...S.btn,
+                display: 'block',
+                textAlign: 'center',
+                width: '100%',
+                boxSizing: 'border-box',
+                fontSize: '12px',
+                padding: '14px 24px',
+              }}
+            >
+              View Opportunity
+            </Link>
           </Section>
         </Section>
       ))}
