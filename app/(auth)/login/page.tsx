@@ -94,6 +94,16 @@ function LoginForm() {
         </Link>
       </p>
 
+      <div className="mt-6 pt-6 border-t border-[#E8E2D6] flex justify-center gap-4">
+        <Link href="/terms" className="text-xs text-[#8A7A60] hover:text-[#C9A84C] transition-colors">
+          Terms &amp; Conditions
+        </Link>
+        <span className="text-xs text-[#C8BEA8]">·</span>
+        <Link href="/privacy" className="text-xs text-[#8A7A60] hover:text-[#C9A84C] transition-colors">
+          Privacy Policy
+        </Link>
+      </div>
+
       {process.env.NODE_ENV === 'development' && (
         <div className="mt-8 pt-6 border-t border-[#E8E2D6]">
           <p className="text-xs text-[#8A7A60] text-center mb-3 font-medium">Test credentials</p>
