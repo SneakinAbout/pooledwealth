@@ -53,13 +53,15 @@ export default function DistributionTool({
       investmentId: investments[0]?.id ?? '',
       totalAmount: 0,
       notes: '',
+      isFinal: false,
     },
   });
 
   const amount = watch('totalAmount');
   const selectedInvestmentId = watch('investmentId');
+  const isFinal = watch('isFinal');
   const selectedInvestment = investments.find((inv) => inv.id === selectedInvestmentId);
-  const isFinalDistribution = selectedInvestment?.status === 'CLOSED';
+  const isClosedInvestment = selectedInvestment?.status === 'CLOSED';
 
   const handlePreview = () => {
     if (!amount || amount <= 0) return;
@@ -81,7 +83,7 @@ export default function DistributionTool({
       if (!res.ok) throw new Error(result.error);
 
       setSuccess(true);
-      toast.success(isFinalDistribution ? 'Final distribution complete — investment marked as Exited' : 'Distribution processed successfully!');
+      toast.success(isFinal ? 'Final distribution complete — investment marked as Exited' : 'Distribution processed successfully!');
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Distribution failed');
@@ -115,17 +117,36 @@ export default function DistributionTool({
           {...register('investmentId')}
         />
 
-        {isFinalDistribution && (
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-semibold text-amber-800">Final Distribution — Investment will be marked as Exited</p>
-              <p className="text-amber-700 mt-0.5">
-                This investment is <strong>Closed</strong>. Running this distribution will pay out all co-owners,
-                remove the investment from their portfolios, and mark it as <strong>Exited</strong>.
-                This action cannot be undone.
-              </p>
-            </div>
+        {isClosedInvestment && (
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border border-[#C8BEA8] bg-[#FAFAF8] hover:bg-[#F7F4EE] transition-colors">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[#1A2B1F]"
+                {...register('isFinal')}
+              />
+              <div className="text-sm">
+                <p className="font-semibold text-[#1A1207]">Mark as Final Distribution</p>
+                <p className="text-[#6A5A40] mt-0.5">
+                  Tick this only when distributing the final sale proceeds. This will remove the
+                  investment from all co-owner portfolios and mark it as <strong>Exited</strong>.
+                  Interim income distributions should be processed without ticking this.
+                </p>
+              </div>
+            </label>
+
+            {isFinal && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800">Final Distribution — Investment will be marked as Exited</p>
+                  <p className="text-amber-700 mt-0.5">
+                    All co-owner holdings will be closed and removed from their portfolios.
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

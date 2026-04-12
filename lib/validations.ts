@@ -66,6 +66,7 @@ export const distributionSchema = z.object({
   investmentId: z.string().cuid('Invalid investment ID'),
   totalAmount: z.number().positive('Amount must be positive'),
   notes: z.string().max(2000).optional(),
+  isFinal: z.boolean().optional().default(false),
 });
 
 export const bankSettingsSchema = z.object({

@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { investmentId, totalAmount, notes } = result.data;
+    const { investmentId, totalAmount, notes, isFinal } = result.data;
 
     const investment = await prisma.investment.findUnique({
       where: { id: investmentId },
@@ -114,9 +114,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // If the investment is CLOSED (asset sold), this is the final distribution.
-      // Mark all holdings as sold and transition investment to EXITED.
-      const isFinalDistribution = investment.status === 'CLOSED';
+      // Only mark as final if admin explicitly opted in via the isFinal flag.
+      // CLOSED investments may have multiple interim distributions before the final one.
+      const isFinalDistribution = !!isFinal && investment.status === 'CLOSED';
       const soldAt = isFinalDistribution ? new Date() : null;
 
       let distributedNetCents = 0;
