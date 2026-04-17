@@ -3,12 +3,13 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
+        // Allow any HTTPS image URL — admins supply these, wildcard is appropriate
         protocol: 'https',
-        hostname: 'images.unsplash.com',
+        hostname: '**',
       },
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
+        protocol: 'http',
+        hostname: '**',
       },
     ],
   },
