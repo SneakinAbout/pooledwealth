@@ -19,6 +19,9 @@ export default async function TrustPage() {
     distributions,
     disbursements,
     walletAggregate,
+    activeCommittedCapital,
+    closedUndisbursedCapital,
+    closedNoDisbCapital,
   ] = await Promise.all([
     prisma.deposit.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
     prisma.withdrawal.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
@@ -43,6 +46,26 @@ export default async function TrustPage() {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.wallet.aggregate({ _sum: { balance: true } }),
+    prisma.transaction.aggregate({
+      where: { type: 'PURCHASE', status: 'COMPLETED', investment: { status: 'ACTIVE' } },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        type: 'PURCHASE',
+        status: 'COMPLETED',
+        investment: { status: 'CLOSED', trustDisbursement: { disbursedAt: null } },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        type: 'PURCHASE',
+        status: 'COMPLETED',
+        investment: { status: 'CLOSED', trustDisbursement: { is: null } },
+      },
+      _sum: { amount: true },
+    }),
   ]);
 
   const totalDeposited = Number(depositAggregate._sum.amount ?? 0);
@@ -78,16 +101,27 @@ export default async function TrustPage() {
     .filter((d) => d.disbursedAt === null)
     .reduce((sum, d) => sum + Number(d.totalRaised), 0);
 
+  const committedCapital =
+    Number(activeCommittedCapital._sum.amount ?? 0) +
+    Number(closedUndisbursedCapital._sum.amount ?? 0) +
+    Number(closedNoDisbCapital._sum.amount ?? 0);
+
+  const mgmtFeesInTrust = totalMgmtFeesCharged - totalMgmtFeesSwept;
+
   const expectedBalance =
     totalDeposited +
     totalSaleProceeds -
     totalWithdrawn -
-    totalMgmtFeesCharged -
     totalVendorDisbursed -
     totalMgmtFeesSwept -
     totalProfitShareSwept;
 
-  const actualBalance = Number(walletAggregate._sum.balance ?? 0);
+  const actualBalance =
+    Number(walletAggregate._sum.balance ?? 0) +
+    committedCapital +
+    mgmtFeesInTrust +
+    profitShareAwaitingSweep;
+
   const discrepancy = actualBalance - expectedBalance;
 
   return (
@@ -102,6 +136,7 @@ export default async function TrustPage() {
         totalVendorDisbursed,
         totalProfitShareSwept,
         profitShareAwaitingSweep,
+        committedCapital,
         expectedBalance,
         actualBalance,
         discrepancy,
