@@ -9,20 +9,25 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/admin/trust/reconciliation
  *
- * Trust IN:
- *   + Investor deposits (bank transfers + Stripe)
- *   + Asset sale proceeds recorded per distribution
+ * Physical trust IN (actual bank flows):
+ *   + Investor deposits
+ *   + Asset sale proceeds received from buyers
  *
- * Trust OUT:
+ * Physical trust OUT (actual bank flows):
  *   - Investor withdrawals
- *   - Management fees charged from investor wallets
- *   - Vendor payments (trust → asset vendor on investment close)
- *   - Management fee sweeps (trust → general account, manual)
- *   - Distribution profit share sweeps (trust → general account, per distribution)
+ *   - Vendor payments (trust → vendor when investment closes)
+ *   - Management fee sweeps (trust → general account)
+ *   - Distribution profit share sweeps (trust → general account)
  *
- * Expected balance = IN - OUT
- * Actual balance   = sum of all investor wallet balances
- * Discrepancy      = Actual - Expected (should be $0)
+ * NOTE: Management fees *charged* from investor wallets are an internal ledger
+ * entry — they do NOT remove money from trust. Only the physical sweep does.
+ *
+ * Expected balance = physical IN − physical OUT
+ * Actual balance   = investor wallets
+ *                  + committed investment capital (purchased units still in trust)
+ *                  + mgmt fees sitting in trust awaiting sweep
+ *                  + profit share sitting in trust awaiting sweep
+ * Discrepancy      = Actual − Expected (should be $0)
  */
 export async function GET() {
   try {
@@ -40,6 +45,11 @@ export async function GET() {
     disbursements,
     walletAggregate,
     pendingDisbursements,
+    // Capital committed to ACTIVE investments (money left wallets but still in trust)
+    activeCommittedCapital,
+    // Capital committed to CLOSED investments where vendor not yet paid
+    closedUndisbursedCapital,
+    closedNoDisbCapital,
   ] = await Promise.all([
     prisma.deposit.aggregate({
       where: { status: 'COMPLETED' },
@@ -49,12 +59,12 @@ export async function GET() {
       where: { status: 'COMPLETED' },
       _sum: { amount: true },
     }),
-    // Monthly management fees deducted from investor wallets
+    // Monthly management fees deducted from investor wallets (internal ledger only)
     prisma.transaction.aggregate({
       where: { type: 'FEE', status: 'COMPLETED', investmentId: null },
       _sum: { amount: true },
     }),
-    // Total management fee sweeps already transferred to general account
+    // Total management fee sweeps actually transferred to general account
     prisma.trustFeeExtraction.aggregate({ _sum: { amount: true } }),
     // All fee sweep records for history
     prisma.trustFeeExtraction.findMany({
@@ -80,6 +90,29 @@ export async function GET() {
     prisma.investment.findMany({
       where: { status: 'CLOSED', trustDisbursement: null },
       select: { id: true, title: true },
+    }),
+    // PURCHASE amounts for ACTIVE investments — money left wallets but hasn't left trust yet
+    prisma.transaction.aggregate({
+      where: { type: 'PURCHASE', status: 'COMPLETED', investment: { status: 'ACTIVE' } },
+      _sum: { amount: true },
+    }),
+    // PURCHASE amounts for CLOSED investments where vendor payment is pending
+    prisma.transaction.aggregate({
+      where: {
+        type: 'PURCHASE',
+        status: 'COMPLETED',
+        investment: { status: 'CLOSED', trustDisbursement: { disbursedAt: null } },
+      },
+      _sum: { amount: true },
+    }),
+    // PURCHASE amounts for CLOSED investments with no disbursement record yet (safety net)
+    prisma.transaction.aggregate({
+      where: {
+        type: 'PURCHASE',
+        status: 'COMPLETED',
+        investment: { status: 'CLOSED', trustDisbursement: { is: null } },
+      },
+      _sum: { amount: true },
     }),
   ]);
 
@@ -113,7 +146,7 @@ export async function GET() {
     .filter((d) => d.profitShareSweptAt !== null)
     .reduce((sum, d) => sum + Number(d.profitShareDeducted), 0);
 
-  // Profit share sitting in trust (distribution processed but not yet swept)
+  // Profit share sitting in trust (distribution processed but not yet swept to general account)
   const profitShareAwaitingSweep = distributions
     .filter((d) => d.profitShareSweptAt === null && Number(d.profitShareDeducted) > 0)
     .reduce((sum, d) => sum + Number(d.profitShareDeducted), 0);
@@ -122,16 +155,31 @@ export async function GET() {
     .filter((d) => d.disbursedAt === null)
     .reduce((sum, d) => sum + Number(d.totalRaised), 0);
 
+  // Total investor capital still sitting in trust (purchased units, not yet vendor-paid)
+  const committedCapital =
+    Number(activeCommittedCapital._sum.amount ?? 0) +
+    Number(closedUndisbursedCapital._sum.amount ?? 0) +
+    Number(closedNoDisbCapital._sum.amount ?? 0);
+
+  // Management fees charged from wallets but not yet physically swept from trust
+  const mgmtFeesInTrust = totalMgmtFeesCharged - totalMgmtFeesSwept;
+
+  // Physical trust balance: only real bank flows (no internal wallet charges)
   const expectedBalance =
     totalDeposited +
     totalSaleProceeds -
     totalWithdrawn -
-    totalMgmtFeesCharged -
     totalVendorDisbursed -
     totalMgmtFeesSwept -
     totalProfitShareSwept;
 
-  const actualBalance = Number(walletAggregate._sum.balance ?? 0);
+  // Full claims on trust: wallets + committed investment capital + fees/profit share awaiting sweep
+  const actualBalance =
+    Number(walletAggregate._sum.balance ?? 0) +
+    committedCapital +
+    mgmtFeesInTrust +
+    profitShareAwaitingSweep;
+
   const discrepancy = actualBalance - expectedBalance;
 
   return NextResponse.json({
@@ -145,6 +193,7 @@ export async function GET() {
       totalVendorDisbursed,
       totalProfitShareSwept,
       profitShareAwaitingSweep,
+      committedCapital,
       expectedBalance,
       actualBalance,
       discrepancy,

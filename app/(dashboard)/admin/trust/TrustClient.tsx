@@ -53,6 +53,7 @@ type Summary = {
   totalVendorDisbursed: number;
   totalProfitShareSwept: number;
   profitShareAwaitingSweep: number;
+  committedCapital: number;
   expectedBalance: number;
   actualBalance: number;
   discrepancy: number;
@@ -309,8 +310,9 @@ export default function TrustClient({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Physical trust bank flows IN */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-green-400">Trust IN</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-400">Physical Trust IN</p>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Investor deposits</span>
@@ -327,8 +329,9 @@ export default function TrustClient({
             </div>
           </div>
 
+          {/* Physical trust bank flows OUT */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-red-400">Trust OUT</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-red-400">Physical Trust OUT</p>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Investor withdrawals</span>
@@ -337,10 +340,6 @@ export default function TrustClient({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Vendor payments (asset purchases)</span>
                 <span className="text-white font-medium">{fmt(summary.totalVendorDisbursed)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Mgmt fees charged from wallets</span>
-                <span className="text-white font-medium">{fmt(summary.totalMgmtFeesCharged)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Mgmt fees swept to general account</span>
@@ -354,8 +353,31 @@ export default function TrustClient({
             <div className="border-t border-navy-600 pt-2 flex justify-between text-sm font-semibold">
               <span className="text-red-400">Total OUT</span>
               <span className="text-red-400">
-                {fmt(summary.totalWithdrawn + summary.totalVendorDisbursed + summary.totalMgmtFeesCharged + summary.totalMgmtFeesSwept + summary.totalProfitShareSwept)}
+                {fmt(summary.totalWithdrawn + summary.totalVendorDisbursed + summary.totalMgmtFeesSwept + summary.totalProfitShareSwept)}
               </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Actual balance breakdown */}
+        <div className="pt-4 border-t border-navy-600 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Actual Balance Breakdown</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-navy-700/40 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Investor Wallets</p>
+              <p className="text-sm font-semibold text-white">{fmt(summary.actualBalance - summary.committedCapital - (summary.totalMgmtFeesCharged - summary.totalMgmtFeesSwept) - summary.profitShareAwaitingSweep)}</p>
+            </div>
+            <div className="bg-navy-700/40 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Committed to Investments</p>
+              <p className="text-sm font-semibold text-white">{fmt(summary.committedCapital)}</p>
+            </div>
+            <div className="bg-navy-700/40 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Mgmt Fees in Trust</p>
+              <p className="text-sm font-semibold text-white">{fmt(Math.max(0, summary.totalMgmtFeesCharged - summary.totalMgmtFeesSwept))}</p>
+            </div>
+            <div className="bg-navy-700/40 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Profit Share in Trust</p>
+              <p className="text-sm font-semibold text-white">{fmt(summary.profitShareAwaitingSweep)}</p>
             </div>
           </div>
         </div>
