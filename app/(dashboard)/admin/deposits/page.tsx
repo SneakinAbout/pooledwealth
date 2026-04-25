@@ -12,17 +12,23 @@ export default async function AdminDepositsPage() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== 'ADMIN') redirect('/investments');
 
-  const deposits = await prisma.deposit.findMany({
-    where: { type: 'BANK_TRANSFER' },
-    include: {
-      wallet: {
-        include: {
-          user: { select: { id: true, name: true, email: true } },
+  const [deposits, users] = await Promise.all([
+    prisma.deposit.findMany({
+      where: { type: 'BANK_TRANSFER' },
+      include: {
+        wallet: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
         },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.user.findMany({
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
 
   const pending = deposits.filter((d) => d.status === 'PENDING').length;
 
@@ -49,16 +55,7 @@ export default async function AdminDepositsPage() {
         )}
       </div>
 
-      {deposits.length === 0 ? (
-        <Card>
-          <div className="py-12 text-center">
-            <Landmark className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-[#6A5A40]">No bank transfer deposits yet.</p>
-          </div>
-        </Card>
-      ) : (
-        <DepositsClient deposits={serialised} />
-      )}
+      <DepositsClient deposits={serialised} users={users} />
     </div>
   );
 }
