@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import Logo from '@/components/ui/Logo';
 import { ShieldCheck, TrendingUp, Lock } from 'lucide-react';
 
 const features = [
@@ -17,11 +17,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#C9A84C]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-[#C9A84C]/10 rounded-full blur-2xl pointer-events-none" />
 
-        <Link href="/" className="relative flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0">
-            <Image src="/logo.png" alt="Pooled Wealth" width={40} height={40} className="w-full h-full object-cover" />
-          </div>
-          <span className="font-bold text-[#F7F4EE] text-xl tracking-tight">Pooled Wealth</span>
+        <Link href="/" className="relative">
+          <Logo variant="dark" size={36} showWordmark />
         </Link>
 
         <div className="relative space-y-8">
@@ -56,11 +53,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Right form panel */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-[#F7F4EE]">
         {/* Mobile logo */}
-        <Link href="/" className="flex items-center gap-2 mb-8 lg:hidden">
-          <div className="h-9 w-9 flex-shrink-0">
-            <Image src="/logo.png" alt="Pooled Wealth" width={36} height={36} className="w-full h-full object-contain" style={{ mixBlendMode: 'multiply' }} />
-          </div>
-          <span className="font-bold text-[#1A1207] text-lg tracking-tight">Pooled Wealth</span>
+        <Link href="/" className="mb-8 lg:hidden">
+          <Logo variant="light" size={32} showWordmark />
         </Link>
 
         <div className="w-full max-w-md">

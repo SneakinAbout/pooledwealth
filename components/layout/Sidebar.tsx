@@ -23,8 +23,8 @@ import {
   ShieldCheck,
   LineChart,
 } from 'lucide-react';
-import Image from 'next/image';
 import { cn, formatCurrency } from '@/lib/utils';
+import Logo from '@/components/ui/Logo';
 import DepositModal from '@/components/wallet/DepositModal';
 import WithdrawModal from '@/components/wallet/WithdrawModal';
 
@@ -177,11 +177,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     <aside className="w-64 bg-[#1A2B1F] border-r border-[#2E4A35] flex flex-col h-full flex-shrink-0">
       {/* Logo */}
       <div className="h-14 px-5 flex items-center border-b border-[#2E4A35] flex-shrink-0">
-        <Link href="/investments" className="flex items-center gap-2.5 group">
-          <div className="h-8 w-8 rounded-lg overflow-hidden flex-shrink-0">
-            <Image src="/logo.png" alt="Pooled Wealth" width={32} height={32} className="w-full h-full object-cover" />
-          </div>
-          <span className="font-bold text-[#F7F4EE] text-base tracking-tight">Pooled Wealth</span>
+        <Link href="/investments">
+          <Logo variant="dark" size={28} showWordmark />
         </Link>
       </div>
 
