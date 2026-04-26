@@ -60,11 +60,17 @@ type Summary = {
   pendingVendorDisbursement: number;
 };
 
+type PendingSetupItem = {
+  id: string;
+  title: string;
+};
+
 type Props = {
   summary: Summary;
   feeExtractions: FeeExtraction[];
   distributions: DistributionRecord[];
   disbursements: DisbursementRecord[];
+  pendingSetup: PendingSetupItem[];
 };
 
 const fmt = (n: number) =>
@@ -87,11 +93,13 @@ export default function TrustClient({
   feeExtractions: initialExtractions,
   distributions: initialDistributions,
   disbursements: initialDisbursements,
+  pendingSetup: initialPendingSetup,
 }: Props) {
   const [summary, setSummary] = useState(initialSummary);
   const [feeExtractions, setFeeExtractions] = useState(initialExtractions);
   const [distributions, setDistributions] = useState(initialDistributions);
   const [disbursements, setDisbursements] = useState(initialDisbursements);
+  const [pendingSetup, setPendingSetup] = useState(initialPendingSetup);
   const [modal, setModal] = useState<ModalType>(null);
   const [saving, setSaving] = useState(false);
 
@@ -184,10 +192,50 @@ export default function TrustClient({
     }
   }
 
+  async function handleCreateDisbursement(investmentId: string) {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/trust/disbursements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ investmentId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
+
+      toast.success('Disbursement record created — record the vendor payment when ready');
+
+      // Refresh reconciliation and remove from pendingSetup
+      const recon = await fetch('/api/admin/trust/reconciliation');
+      const data = await recon.json();
+      setSummary(data.summary);
+      setFeeExtractions(data.feeExtractions ?? []);
+      setDistributions(data.distributions ?? []);
+      setDisbursements(data.disbursements ?? []);
+      setPendingSetup((prev) => prev.filter((i) => i.id !== investmentId));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const hasDiscrepancy = Math.abs(summary.discrepancy) > 0.01;
 
   // Build action items
-  const actionItems: { id: string; label: string; sublabel: string; amount: number; tag: string; onAction: () => void }[] = [];
+  const actionItems: { id: string; label: string; sublabel: string; amount: number | null; tag: string; buttonLabel?: string; onAction: () => void }[] = [];
+
+  // Highest priority: closed investments with no disbursement record at all
+  pendingSetup.forEach((inv) => {
+    actionItems.push({
+      id: `setup-${inv.id}`,
+      label: `${inv.title} — create trust disbursement record`,
+      sublabel: 'Investment is CLOSED but has no disbursement tracking record yet',
+      amount: null,
+      tag: 'Setup Required',
+      buttonLabel: 'Create Record',
+      onAction: () => handleCreateDisbursement(inv.id),
+    });
+  });
 
   if (summary.mgmtFeesAwaitingSweep > 0.01) {
     const lastSweep = feeExtractions.length > 0 ? fmtDate(feeExtractions[0].extractedAt) : null;
@@ -278,19 +326,22 @@ export default function TrustClient({
           <div className="divide-y divide-navy-700">
             {actionItems.map((item) => (
               <div key={item.id} className="flex items-center gap-4 px-5 py-4">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gold-500/15 text-gold-400 border border-gold-500/30 whitespace-nowrap flex-shrink-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 ${item.tag === 'Setup Required' ? 'bg-red-500/15 text-red-400 border-red-500/30' : 'bg-gold-500/15 text-gold-400 border-gold-500/30'}`}>
                   {item.tag}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-200">{item.label}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{item.sublabel}</p>
                 </div>
-                <span className="text-sm font-semibold text-white whitespace-nowrap">{fmt(item.amount)}</span>
+                {item.amount !== null && (
+                  <span className="text-sm font-semibold text-white whitespace-nowrap">{fmt(item.amount)}</span>
+                )}
                 <button
                   onClick={item.onAction}
-                  className="px-4 py-1.5 text-xs rounded-lg bg-gold-500 hover:bg-gold-400 text-navy-900 font-semibold transition-colors whitespace-nowrap"
+                  disabled={saving}
+                  className="px-4 py-1.5 text-xs rounded-lg bg-gold-500 hover:bg-gold-400 text-navy-900 font-semibold transition-colors whitespace-nowrap disabled:opacity-50"
                 >
-                  Mark Complete
+                  {item.buttonLabel ?? 'Mark Complete'}
                 </button>
               </div>
             ))}
@@ -513,7 +564,7 @@ export default function TrustClient({
         </div>
         {disbursements.length === 0 ? (
           <div className="p-12 text-center text-gray-500 text-sm">
-            No disbursement records yet. Created automatically when an investment is closed.
+            No disbursement records yet. Records are created when an investment is closed — use the <span className="text-gold-400">Actions Required</span> section above if a closed investment is missing.
           </div>
         ) : (
           <div className="overflow-x-auto">

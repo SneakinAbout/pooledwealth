@@ -22,6 +22,7 @@ export default async function TrustPage() {
     activeCommittedCapital,
     closedUndisbursedCapital,
     closedNoDisbCapital,
+    pendingSetup,
   ] = await Promise.all([
     prisma.deposit.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
     prisma.withdrawal.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
@@ -65,6 +66,11 @@ export default async function TrustPage() {
         investment: { status: 'CLOSED', trustDisbursement: { is: null } },
       },
       _sum: { amount: true },
+    }),
+    // CLOSED investments with no TrustDisbursement — need manual setup in trust dashboard
+    prisma.investment.findMany({
+      where: { status: 'CLOSED', trustDisbursement: null },
+      select: { id: true, title: true },
     }),
   ]);
 
@@ -126,6 +132,7 @@ export default async function TrustPage() {
 
   return (
     <TrustClient
+      pendingSetup={pendingSetup}
       summary={{
         totalDeposited,
         totalSaleProceeds,
