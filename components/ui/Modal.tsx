@@ -39,14 +39,14 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
       />
       <div
         className={cn(
-          'relative w-full bg-white border border-[#E8E2D6] rounded-2xl animate-in fade-in zoom-in-95 duration-150',
+          'relative w-full bg-white border border-[#E8E2D6] rounded-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[calc(100vh-2rem)]',
           sizes[size]
         )}
         role="dialog"
         aria-modal="true"
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E2D6]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E2D6] flex-shrink-0">
             <h2 className="text-base font-semibold text-[#1A1207]">{title}</h2>
             <button
               onClick={onClose}
@@ -57,7 +57,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

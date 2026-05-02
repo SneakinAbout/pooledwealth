@@ -15,6 +15,8 @@ import SupplementFinalised from '../emails/templates/supplement-finalised';
 import InvestmentUpdate from '../emails/templates/investment-update';
 import ProposalVoteOpened from '../emails/templates/proposal-vote-opened';
 import NewInvestmentsDigest, { type DigestInvestment } from '../emails/templates/new-investments-digest';
+import RecurringDepositReminder from '../emails/templates/recurring-deposit-reminder';
+import RecurringDepositCancelled from '../emails/templates/recurring-deposit-cancelled';
 
 const FROM = process.env.EMAIL_FROM || 'Pooled Wealth <noreply@pooledwealth.com>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -105,6 +107,24 @@ export async function sendNewInvestmentsDigest(
     ? `1 new investment available on Pooled Wealth`
     : `${investments.length} new investments available on Pooled Wealth`;
   await send(to, subject, html);
+}
+
+export async function sendRecurringDepositReminder(
+  to: string,
+  name: string,
+  amount: number,
+  frequency: string,
+  nextExpectedDate: Date,
+) {
+  const html = await render(RecurringDepositReminder({ name, amount, frequency, nextExpectedDate }));
+  const freqLabel = frequency === 'WEEKLY' ? 'weekly' : frequency === 'FORTNIGHTLY' ? 'fortnightly' : 'monthly';
+  await send(to, `Missed ${freqLabel} deposit — transfer reminder`, html);
+}
+
+export async function sendRecurringDepositCancelled(to: string, name: string, frequency: string) {
+  const html = await render(RecurringDepositCancelled({ name, frequency }));
+  const freqLabel = frequency === 'WEEKLY' ? 'weekly' : frequency === 'FORTNIGHTLY' ? 'fortnightly' : 'monthly';
+  await send(to, `Your ${freqLabel} recurring deposit schedule has been cancelled`, html);
 }
 
 export type { DigestInvestment };
