@@ -31,13 +31,13 @@ async function main() {
     data: { email: 'manager@pooledwealth.com', name: 'Sarah Chen', password: hashedPassword, role: Role.MANAGER, kycApproved: true },
   });
   const investor1 = await prisma.user.create({
-    data: { email: 'alice@example.com', name: 'Alice Johnson', password: hashedPassword, role: Role.INVESTOR, kycApproved: true },
+    data: { email: 'alice@example.com', name: 'Alice Johnson', password: hashedPassword, role: Role.INVESTOR, kycApproved: true, depositCode: 'PW-1001' },
   });
   const investor2 = await prisma.user.create({
-    data: { email: 'bob@example.com', name: 'Bob Williams', password: hashedPassword, role: Role.INVESTOR, kycApproved: true },
+    data: { email: 'bob@example.com', name: 'Bob Williams', password: hashedPassword, role: Role.INVESTOR, kycApproved: true, depositCode: 'PW-1002' },
   });
   const investor3 = await prisma.user.create({
-    data: { email: 'charlie@example.com', name: 'Charlie Brown', password: hashedPassword, role: Role.INVESTOR, kycApproved: false },
+    data: { email: 'charlie@example.com', name: 'Charlie Brown', password: hashedPassword, role: Role.INVESTOR, kycApproved: false, depositCode: 'PW-1003' },
   });
 
   console.log('✅ Users created');

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/permissions';
 import { auditLog } from '@/lib/audit';
 import { sendDepositApproved } from '@/lib/email';
+import { collectOutstandingFees } from '@/lib/collectOutstandingFees';
 import { formatCurrency } from '@/lib/utils';
 
 // Approve a pending bank transfer deposit: mark COMPLETED and credit the wallet.
@@ -70,6 +71,9 @@ export async function POST(
           status: 'COMPLETED',
         },
       });
+
+      // Collect any outstanding fees now that the wallet has been topped up
+      await collectOutstandingFees(tx, deposit.wallet.userId, deposit.walletId);
 
       return true;
     });

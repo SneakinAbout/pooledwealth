@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { collectOutstandingFees } from '@/lib/collectOutstandingFees';
 import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
@@ -59,6 +60,9 @@ export async function POST(request: NextRequest) {
                 stripePaymentIntentId: paymentIntent.id,
               },
             });
+
+            // Collect any outstanding fees now that the wallet has been topped up
+            await collectOutstandingFees(tx, deposit.wallet.userId, deposit.walletId);
           });
         }
       }

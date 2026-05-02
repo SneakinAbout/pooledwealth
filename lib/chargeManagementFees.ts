@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { sendFeeOutstanding } from '@/lib/email';
+import { formatCurrency } from '@/lib/utils';
 
 interface ChargeResult {
   charged: number;
@@ -14,8 +16,9 @@ function calcEffectiveFee(totalInvested: number, annualPct: number, discountPct:
 
 /**
  * Charges monthly management fees for all users with holdings.
- * Uses an atomic wallet.updateMany (balance >= fee) to avoid stale-read races.
- * Returns counts of charged and skipped users plus total collected.
+ * - If the wallet has sufficient balance: deducts immediately.
+ * - If not: records the debt on wallet.outstandingFees and emails the investor.
+ * Returns counts of charged / skipped users plus total collected.
  */
 export async function chargeManagementFees(): Promise<ChargeResult> {
   const [settings, users] = await Promise.all([
@@ -27,6 +30,7 @@ export async function chargeManagementFees(): Promise<ChargeResult> {
           where: { soldAt: null, investment: { status: { in: ['CLOSED'] } } },
           select: { purchasePrice: true },
         },
+        wallet: { select: { id: true } },
       },
     }),
   ]);
@@ -35,8 +39,6 @@ export async function chargeManagementFees(): Promise<ChargeResult> {
   let charged = 0, skipped = 0, totalCollected = 0;
 
   for (const user of users) {
-    // purchasePrice on a Holding is the cumulative cost basis for that holding
-    // (incremented on each subsequent purchase). Summing gives total invested capital.
     const totalInvested = user.holdings.reduce((sum, h) => sum + Number(h.purchasePrice), 0);
     if (totalInvested === 0) continue;
 
@@ -45,7 +47,6 @@ export async function chargeManagementFees(): Promise<ChargeResult> {
     if (effective === 0) { charged++; continue; } // 100% discount
 
     // Atomically deduct fee only if wallet has sufficient balance.
-    // updateMany with balance >= effective is a single SQL UPDATE — no stale-read race.
     const wasCharged = await prisma.$transaction(async (tx) => {
       const updated = await tx.wallet.updateMany({
         where: { userId: user.id, balance: { gte: effective } },
@@ -63,6 +64,19 @@ export async function chargeManagementFees(): Promise<ChargeResult> {
       totalCollected += effective;
     } else {
       skipped++;
+
+      // Record the debt so it is collected on the investor's next deposit
+      if (user.wallet) {
+        await prisma.wallet.update({
+          where: { id: user.wallet.id },
+          data: { outstandingFees: { increment: effective } },
+        });
+      }
+
+      // Notify the investor — fire-and-forget, don't fail the cron if email errors
+      sendFeeOutstanding(user.email, user.name ?? 'there', formatCurrency(effective)).catch((err) => {
+        console.error(`[chargeManagementFees] Email failed for ${user.email}:`, err);
+      });
     }
   }
 

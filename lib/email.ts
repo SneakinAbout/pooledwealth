@@ -9,6 +9,7 @@ import DepositApproved from '../emails/templates/deposit-approved';
 import DepositRejected from '../emails/templates/deposit-rejected';
 import WithdrawalApproved from '../emails/templates/withdrawal-approved';
 import WithdrawalRejected from '../emails/templates/withdrawal-rejected';
+import FeeOutstanding from '../emails/templates/fee-outstanding';
 import DistributionReceived from '../emails/templates/distribution-received';
 import SupplementFinalised from '../emails/templates/supplement-finalised';
 import InvestmentUpdate from '../emails/templates/investment-update';
@@ -66,6 +67,11 @@ export async function sendWithdrawalApproved(to: string, name: string, amount: s
 export async function sendWithdrawalRejected(to: string, name: string, amount: string) {
   const html = await render(WithdrawalRejected({ name, amount }));
   await send(to, `Withdrawal of ${amount} rejected`, html);
+}
+
+export async function sendFeeOutstanding(to: string, name: string, amount: string) {
+  const html = await render(FeeOutstanding({ name, amount }));
+  await send(to, `Management fee of ${amount} could not be collected`, html);
 }
 
 export async function sendDistributionReceived(to: string, name: string, amount: string, investmentTitle: string) {

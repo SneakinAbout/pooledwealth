@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/permissions';
 import { rateLimit } from '@/lib/rateLimit';
+import { assignDepositCode } from '@/lib/depositCode';
 import { z } from 'zod';
 
 export async function POST(request: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       create: { userId: session!.user.id, balance: 0 },
     });
 
-    const reference = `PW-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const depositCode = await assignDepositCode(session!.user.id);
 
     await prisma.deposit.create({
       data: {
@@ -56,11 +57,11 @@ export async function POST(request: NextRequest) {
         amount,
         status: 'PENDING',
         type: 'BANK_TRANSFER',
-        stripePaymentIntentId: reference,
+        stripePaymentIntentId: `${depositCode}-${Date.now()}`,
       },
     });
 
-    return NextResponse.json({ reference });
+    return NextResponse.json({ reference: depositCode });
   } catch (err) {
     console.error('[POST /api/wallet/deposit/bank]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

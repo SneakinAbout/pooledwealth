@@ -25,7 +25,7 @@ export default async function AdminDepositsPage() {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.user.findMany({
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, depositCode: true },
       orderBy: { name: 'asc' },
     }),
   ]);

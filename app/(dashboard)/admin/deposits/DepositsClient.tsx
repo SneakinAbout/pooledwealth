@@ -25,6 +25,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  depositCode: string | null;
 }
 
 interface StatementMatch {
@@ -64,41 +65,64 @@ function parseCSVRows(csv: string): string[][] {
 }
 
 // ─── Match statement rows against deposit references ─────────────────────────
-function parseStatement(csv: string, deposits: Deposit[]): Map<string, StatementMatch> {
+// Matches by investor deposit code (PW-XXXX) or legacy per-deposit reference.
+function parseStatement(csv: string, deposits: Deposit[], users: User[]): Map<string, StatementMatch> {
   const result = new Map<string, StatementMatch>();
-  const pendingRefs = deposits
-    .filter((d) => d.reference && d.status === 'PENDING')
-    .map((d) => d.reference);
+  const pendingDeposits = deposits.filter((d) => d.status === 'PENDING');
+  if (pendingDeposits.length === 0) return result;
 
-  if (pendingRefs.length === 0) return result;
+  // Build lookup: depositCode → userId for investor code matching
+  const codeToUserId = new Map<string, string>();
+  for (const u of users) {
+    if (u.depositCode) codeToUserId.set(u.depositCode, u.id);
+  }
+
+  // Collect all codes to search for: investor deposit codes + legacy per-deposit refs
+  const searchCodes = new Set<string>();
+  for (const u of users) {
+    if (u.depositCode) searchCodes.add(u.depositCode);
+  }
+  for (const d of pendingDeposits) {
+    if (d.reference) searchCodes.add(d.reference);
+  }
+
+  const searchCodesArr = Array.from(searchCodes);
+  if (searchCodesArr.length === 0) return result;
 
   const rows = parseCSVRows(csv);
 
   for (const row of rows) {
     const rowText = row.join(' ');
 
-    for (const ref of pendingRefs) {
-      if (!rowText.includes(ref)) continue;
+    for (const code of searchCodesArr) {
+      if (!rowText.includes(code)) continue;
 
       const numbers = row
         .map((cell) => parseFloat(cell.replace(/[$,]/g, '')))
         .filter((n) => !isNaN(n) && n > 0 && n < 10_000_000);
-
-      const deposit = deposits.find((d) => d.reference === ref)!;
-      const exactMatch = numbers.find((n) => Math.abs(n - deposit.amount) < 0.01);
-      const statementAmount = exactMatch ?? (numbers.length > 0 ? Math.max(...numbers) : 0);
 
       const dateCell =
         row.find((c) => /\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}/.test(c)) ??
         row.find((c) => /\d{4}-\d{2}-\d{2}/.test(c)) ??
         '';
 
-      result.set(ref, {
-        statementAmount,
-        statementDate: dateCell,
-        statementDescription: row.join(' | ').slice(0, 120),
-        amountMatches: Math.abs(statementAmount - deposit.amount) < 0.01,
-      });
+      // Find which pending deposits this matches (by investor code or direct ref)
+      const userId = codeToUserId.get(code);
+      const matched = userId
+        ? pendingDeposits.filter((d) => d.user.id === userId)
+        : pendingDeposits.filter((d) => d.reference === code);
+
+      const statementAmount = numbers.length > 0 ? Math.max(...numbers) : 0;
+
+      for (const deposit of matched) {
+        if (result.has(deposit.id)) continue;
+        result.set(deposit.id, {
+          statementAmount,
+          statementDate: dateCell,
+          statementDescription: row.join(' | ').slice(0, 120),
+          amountMatches: Math.abs(statementAmount - deposit.amount) < 0.01,
+        });
+      }
       break;
     }
   }
@@ -397,7 +421,7 @@ export default function DepositsClient({
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string;
-          const newMatches = parseStatement(text, deposits);
+          const newMatches = parseStatement(text, deposits, users);
           setMatches(newMatches);
           if (newMatches.size === 0) {
             toast('No references matched — check the CSV contains PW-… reference codes', { icon: '⚠️' });
@@ -415,7 +439,7 @@ export default function DepositsClient({
       };
       reader.readAsText(file);
     },
-    [deposits]
+    [deposits, users]
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -613,7 +637,7 @@ export default function DepositsClient({
                   </tr>
                 )}
                 {deposits.map((d) => {
-                  const match = matches.get(d.reference);
+                  const match = matches.get(d.id);
                   const rowHighlight =
                     statementName && d.status === 'PENDING'
                       ? match
@@ -628,6 +652,12 @@ export default function DepositsClient({
                       <td className="py-3.5">
                         <p className="font-medium text-[#1A1207]">{d.user.name}</p>
                         <p className="text-xs text-[#6A5A40]">{d.user.email}</p>
+                        {(() => {
+                          const u = users.find((u) => u.id === d.user.id);
+                          return u?.depositCode ? (
+                            <code className="text-[10px] text-[#C9A84C] bg-[#C9A84C]/10 px-1.5 py-0.5 rounded mt-0.5 inline-block">{u.depositCode}</code>
+                          ) : null;
+                        })()}
                       </td>
                       <td className="py-3.5 text-right font-semibold font-mono-val">
                         {formatCurrency(d.amount)}

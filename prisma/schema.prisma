@@ -77,6 +77,9 @@ model User {
   state          String?   // AU state/territory: NSW, VIC, QLD, SA, WA, TAS, NT, ACT
   postcode       String?
 
+  // Persistent deposit reference code for recurring bank transfers (e.g. PW-1001)
+  depositCode       String?   @unique
+
   // Bank account (for withdrawals)
   bankAccountName   String?
   bankBsb           String?
@@ -121,10 +124,11 @@ model User {
 }
 
 model Wallet {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  balance   Decimal  @default(0) @db.Decimal(18, 2)
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  balance         Decimal  @default(0) @db.Decimal(18, 2)
+  outstandingFees Decimal  @default(0) @db.Decimal(18, 2)
+  updatedAt       DateTime @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   deposits Deposit[]
