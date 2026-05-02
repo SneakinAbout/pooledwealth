@@ -4,21 +4,12 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/permissions';
 import { z } from 'zod';
-import { addDays, addWeeks } from 'date-fns';
-
-function nextDateFromNow(frequency: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'): Date {
-  const now = new Date();
-  if (frequency === 'WEEKLY') return addWeeks(now, 1);
-  if (frequency === 'FORTNIGHTLY') return addDays(now, 14);
-  // MONTHLY
-  const d = new Date(now);
-  d.setMonth(d.getMonth() + 1);
-  return d;
-}
 
 const upsertSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
   frequency: z.enum(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY']),
+  // ISO date string for when the investor's first bank transfer will go out
+  startDate: z.string().datetime({ message: 'Invalid start date' }),
 });
 
 export async function GET() {
@@ -59,8 +50,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error.errors[0].message }, { status: 400 });
   }
 
-  const { amount, frequency } = result.data;
-  const nextExpectedDate = nextDateFromNow(frequency);
+  const { amount, frequency, startDate } = result.data;
+  const nextExpectedDate = new Date(startDate);
+
+  // Must be in the future
+  if (nextExpectedDate <= new Date()) {
+    return NextResponse.json({ error: 'Start date must be in the future' }, { status: 400 });
+  }
 
   const schedule = await prisma.recurringDeposit.upsert({
     where: { userId: session!.user.id },

@@ -53,6 +53,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [recurringAmount, setRecurringAmount] = useState(1000);
   const [recurringFrequency, setRecurringFrequency] = useState<'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'>('MONTHLY');
+  const [recurringStartDate, setRecurringStartDate] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [cancellingSchedule, setCancellingSchedule] = useState(false);
 
@@ -107,12 +108,14 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   };
 
   const handleSaveSchedule = async () => {
+    if (!recurringStartDate) { toast.error('Please select a start date'); return; }
+    if (new Date(recurringStartDate) <= new Date()) { toast.error('Start date must be in the future'); return; }
     setSavingSchedule(true);
     try {
       const res = await fetch('/api/wallet/recurring', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: recurringAmount, frequency: recurringFrequency }),
+        body: JSON.stringify({ amount: recurringAmount, frequency: recurringFrequency, startDate: new Date(recurringStartDate).toISOString() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -144,6 +147,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
     setNotified(false);
     setAmount(1000);
     setShowRecurringForm(false);
+    setRecurringStartDate('');
     onClose();
   };
 
@@ -401,6 +405,19 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-[#6A5A40] mb-1.5">
+                  Date of first transfer
+                  <span className="text-[#8A7A60] font-normal ml-1">— match the date in your bank app</span>
+                </label>
+                <input
+                  type="date"
+                  value={recurringStartDate}
+                  min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                  onChange={(e) => setRecurringStartDate(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-[#C8BEA8] rounded-xl text-[#1A1207] text-sm focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/30 bg-white"
+                />
+              </div>
               <p className="text-xs text-[#8A7A60]">
                 Set up a matching recurring transfer in your bank app using reference <strong className="text-[#C9A84C]">{depositCode}</strong>.
                 We&apos;ll track it and remind you if a transfer is missed. After 2 consecutive misses the schedule auto-cancels.
@@ -413,7 +430,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   size="sm"
                   onClick={handleSaveSchedule}
                   loading={savingSchedule}
-                  disabled={recurringAmount < 10}
+                  disabled={recurringAmount < 10 || !recurringStartDate}
                   className="flex-1"
                 >
                   Save Schedule
