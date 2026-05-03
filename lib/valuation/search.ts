@@ -41,21 +41,21 @@ async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem
   const appId = process.env.EBAY_APP_ID;
   if (!appId) throw new Error('EBAY_APP_ID not configured');
 
-  const params = new URLSearchParams({
-    'OPERATION-NAME': 'findCompletedItems',
-    'SERVICE-VERSION': '1.0.0',
-    'SECURITY-APPNAME': appId,
-    'RESPONSE-DATA-FORMAT': 'JSON',
-    'GLOBAL-ID': globalId,
-    'keywords': query,
-    'itemFilter(0).name': 'SoldItemsOnly',
-    'itemFilter(0).value': 'true',
-    'sortOrder': 'EndTimeSoonest',
-    'paginationInput.entriesPerPage': '50',
-  });
+  // Build URL manually — URLSearchParams encodes ( ) to %28 %29 which eBay rejects
+  const url =
+    `https://svcs.ebay.com/services/search/FindingService/v1` +
+    `?OPERATION-NAME=findCompletedItems` +
+    `&SERVICE-VERSION=1.0.0` +
+    `&SECURITY-APPNAME=${encodeURIComponent(appId)}` +
+    `&RESPONSE-DATA-FORMAT=JSON` +
+    `&GLOBAL-ID=${globalId}` +
+    `&keywords=${encodeURIComponent(query)}` +
+    `&itemFilter(0).name=SoldItemsOnly` +
+    `&itemFilter(0).value=true` +
+    `&sortOrder=EndTimeSoonest` +
+    `&paginationInput.entriesPerPage=50`;
 
-  const url = `https://svcs.ebay.com/services/search/FindingService/v1?${params}`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`eBay API ${globalId} error: ${res.status}`);
 
   const data = await res.json();
