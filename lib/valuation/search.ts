@@ -55,7 +55,8 @@ async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem
     `&sortOrder=EndTimeSoonest` +
     `&paginationInput.entriesPerPage=50`;
 
-  const res = await fetch(url);
+  // Cache eBay results for 24h to avoid burning daily API call quota
+  const res = await fetch(url, { next: { revalidate: 86400 } });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     console.error(`[eBay ${globalId}] HTTP ${res.status} for query="${query}": ${body.slice(0, 300)}`);
