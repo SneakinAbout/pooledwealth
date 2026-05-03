@@ -20,61 +20,48 @@ export async function searchAndExtractComps(
   const priorMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
   const monthLabel = priorMonthStart.toLocaleString('en-AU', { month: 'long', year: 'numeric' });
 
-  const systemPrompt = `You are a specialist in collectible and alternative asset valuations. Your job is to find eBay sold listings for a specific asset, extract the sold prices, and filter out bad comparables.
+  const systemPrompt = `You are a collectible asset valuation specialist. Search eBay sold listings and return a JSON result.
 
-Asset being valued:
-- Title: ${asset.title}
-- Format: ${classification.format} (${classification.formatDescription})
-- Category: ${asset.category}
-${asset.grade ? `- Grade: ${asset.grade}` : ''}
-${asset.gradingCompany ? `- Grading company: ${asset.gradingCompany}` : ''}
-${asset.edition ? `- Edition: ${asset.edition}` : ''}
+Asset: ${asset.title}
+Format: ${classification.format} (${classification.formatDescription})
+Category: ${asset.category}${asset.grade ? `\nGrade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\nEdition: ${asset.edition}` : ''}
 
-You must EXCLUDE comps that are a DIFFERENT FORMAT than this asset. For example:
-- If this is a SEALED BOOSTER BOX, exclude singles, packs, and cases — only include booster box sales
-- If this is a PSA 10 graded card, only include the SAME grade from the SAME grader — not PSA 9, not raw
-- If this is a RAW/ungraded card, exclude graded copies
-- If this is a SINGLE CARD, exclude bundles, lots, complete sets
-- Exclude: damaged, altered, fake, replica, for-parts listings
-- Exclude: bulk lots, "lot of X" listings unless this asset IS a lot
-- Exclude: listings with suspiciously low prices (likely fake/damaged) or suspiciously high (likely error)
+FILTERING RULES — only include comps that match this exact format:
+- Graded card: same grade + same grader only (PSA 10 ≠ PSA 9)
+- Raw card: ungraded only, exclude graded
+- Booster box: sealed boxes only, exclude singles/packs/cases
+- Sealed case: full cases only
+- Sneakers/watches: same model, exclude fakes/replicas
+- Always exclude: lots, bundles, damaged, altered, "for parts"
 
-After searching and filtering, return ONLY a JSON object with this exact shape:
-{
-  "cleanPrices": [<array of valid sold prices in AUD, converted from USD at 0.65 if needed>],
-  "rawListingsFound": <total number of listings you found before filtering>,
-  "filteredOut": <number excluded>,
-  "flaggedForReview": <true if fewer than 3 valid comps found>,
-  "flagReason": "<optional: why flagged, e.g. 'Only 1 comp found' or 'All results were different format'>"
-}`;
+Return ONLY this JSON (no prose):
+{"cleanPrices":[<AUD prices, convert USD×0.65>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":"<string or null>"}`;
 
-  const userMessage = `Search eBay for sold listings of this asset from ${monthLabel} (the prior calendar month: ${priorMonthStart.toDateString()} to ${priorMonthEnd.toDateString()}).
-
-Search query to use: "${classification.searchQuery}" site:ebay.com sold
-
-Search for eBay completed/sold listings. Extract all sold prices, convert to AUD if in USD (use rate 0.65), filter bad comps as instructed, then return the JSON result.`;
+  const userMessage = `Search eBay completed/sold listings for: "${classification.searchQuery}" sold ${monthLabel} (${priorMonthStart.toDateString()} – ${priorMonthEnd.toDateString()}). Return the JSON.`;
 
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: userMessage },
   ];
 
+  // web_search_20250305 works on Haiku 4.5 (much cheaper than Sonnet).
+  // It's a server-side tool — Anthropic executes it automatically; loop on pause_turn.
+  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search', max_uses: 1 }];
+
   let response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
+    model: 'claude-haiku-4-5',
+    max_tokens: 1024,
     system: systemPrompt,
-    tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+    tools: toolConfig,
     messages,
   });
 
-  // web_search_20260209 is a server-side tool — Anthropic executes it automatically.
-  // Loop on pause_turn (not tool_use) until end_turn; never inject tool results manually.
   while (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content });
     response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
       system: systemPrompt,
-      tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+      tools: toolConfig,
       messages,
     });
   }
@@ -88,7 +75,7 @@ Search for eBay completed/sold listings. Extract all sold prices, convert to AUD
       rawListingsFound: 0,
       filteredOut: 0,
       flaggedForReview: true,
-      flagReason: 'Haiku returned no structured data',
+      flagReason: 'No structured data returned',
     };
   }
 
