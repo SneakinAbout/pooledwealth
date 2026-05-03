@@ -16,42 +16,34 @@ export async function searchAndExtractComps(
   classification: AssetClassification,
 ): Promise<CompResult> {
   const now = new Date();
-  const priorMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const priorMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  const monthLabel = priorMonthStart.toLocaleString('en-AU', { month: 'long', year: 'numeric' });
   const todayStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const systemPrompt = `You are a collectible asset valuation specialist. Today is ${todayStr}.
 
-Your task is to find ACTUAL COMPLETED SALE PRICES for the asset below — not asking prices, not presales, not current listings. Real transactions that have already closed.
+Your task: find the current market value of the asset below by searching price tracking and marketplace sites. You need ACTUAL TRANSACTION PRICES — not asking prices or presales.
 
-Asset being valued:
+Asset:
 - Title: ${asset.title}
 - Format: ${classification.format} (${classification.formatDescription})
 - Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\n- Edition: ${asset.edition}` : ''}
 
-Search strategy — try these sources in order:
-1. eBay Australia completed/sold listings: search "ebay.com.au ${classification.searchQuery} sold completed"
-2. eBay US completed listings: search "ebay.com ${classification.searchQuery} completed sold"
-3. Price history sites: search "${classification.searchQuery} sold price worthpoint OR pricecharting OR cardmarket"
+Search these sources in order (stop once you have 3+ prices):
+1. pricecharting.com — search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices
+2. TCGPlayer market price — search "tcgplayer.com ${classification.searchQuery} market price"
+3. Google Shopping sold data — search "${classification.searchQuery} sealed booster box sold price AUD"
 
-Filtering rules — ONLY include comps matching this exact format:
-- Sealed booster box: sealed boxes only — exclude singles, packs, cases, opened
-- Graded card: same grade + same grader exactly (PSA 10 ≠ PSA 9)
-- Raw card: ungraded copies only
-- Always exclude: presales, lots, bundles, damaged, fake, "for parts"
-- Convert USD to AUD at rate ×1.55 (AUD is weaker than USD)
+Filtering rules:
+- Only include prices for the EXACT same product format (sealed box ≠ singles ≠ cases)
+- Convert USD to AUD by multiplying by 1.55
+- Exclude obvious outliers (damaged, fake, "for parts")
 
-You MUST respond with ONLY this JSON object — zero prose before or after it:
-{"cleanPrices":[<AUD numbers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}
+You MUST respond with ONLY this JSON — zero words before or after:
+{"cleanPrices":[<AUD numbers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`;
 
-If you find zero sold prices after searching, still return the JSON with empty cleanPrices and a flagReason explaining what you found.`;
-
-  const userMessage = `Find completed sale prices for: ${asset.title}
+  const userMessage = `Find market prices for: ${asset.title}
 Search term: ${classification.searchQuery}
-Target period: recent sales (ideally ${monthLabel}, but use any recent sales if that month has few results)
 
-Search now and return ONLY the JSON.`;
+Search pricecharting.com first, then TCGPlayer, then general price searches. Return ONLY the JSON.`;
 
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: userMessage },
@@ -67,7 +59,6 @@ Search now and return ONLY the JSON.`;
     messages,
   });
 
-  // Server-side tool: loop on pause_turn until end_turn — no manual tool results needed.
   while (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content });
     response = await client.messages.create({
