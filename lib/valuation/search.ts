@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type { AssetClassification, AssetInput } from './classify';
 
 export interface CompResult {
@@ -9,92 +8,120 @@ export interface CompResult {
   flagReason?: string;
 }
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const USD_TO_AUD = 1.55;
 
-export async function searchAndExtractComps(
-  asset: AssetInput,
-  classification: AssetClassification,
-): Promise<CompResult> {
-  const now = new Date();
-  const todayStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+// Bad-comp keywords that always disqualify a listing
+const GLOBAL_EXCLUDES = [
+  'damaged', 'fake', 'replica', 'for parts', 'not working', 'incomplete',
+  'altered', 'restored', 'reprint', 'custom', 'proxy',
+];
 
-  const systemPrompt = `You are a collectible asset valuation specialist. Today is ${todayStr}.
+// Format-specific inclusion/exclusion rules
+const FORMAT_RULES: Record<string, { mustInclude?: string[]; mustExclude?: string[] }> = {
+  booster_box:        { mustInclude: ['box'], mustExclude: ['case', ' pack ', 'single', 'lot of', 'bundle'] },
+  sealed_booster_box: { mustInclude: ['box'], mustExclude: ['case', ' pack ', 'single', 'lot of', 'bundle'] },
+  booster_pack:       { mustInclude: ['pack'], mustExclude: ['box', 'case', 'lot of', 'bundle'] },
+  sealed_case:        { mustInclude: ['case'], mustExclude: ['single', 'pack', 'lot of'] },
+  complete_set:       { mustExclude: ['incomplete', 'partial'] },
+  single_card_graded: { mustExclude: ['lot', 'bundle', 'case', 'box'] },
+  single_card_raw:    { mustExclude: ['psa', 'bgs', 'cgc', 'sgc', 'ace', 'lot', 'bundle', 'case', 'box'] },
+  sports_card_graded: { mustExclude: ['lot', 'bundle', 'case', 'box'] },
+  sports_card_raw:    { mustExclude: ['psa', 'bgs', 'cgc', 'sgc', 'lot', 'bundle'] },
+  sneakers:           { mustExclude: ['fake', 'replica', 'used', 'worn', 'display', 'lace'] },
+  watch:              { mustExclude: ['parts', 'repair', 'broken', 'replica', 'movement only'] },
+};
 
-Your task: find the current market value of the asset below by searching price tracking and marketplace sites. You need ACTUAL TRANSACTION PRICES — not asking prices or presales.
+interface EbayItem {
+  title: string;
+  priceAUD: number;
+  endTime: string;
+}
 
-Asset:
-- Title: ${asset.title}
-- Format: ${classification.format} (${classification.formatDescription})
-- Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\n- Edition: ${asset.edition}` : ''}
+async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem[]> {
+  const appId = process.env.EBAY_APP_ID;
+  if (!appId) throw new Error('EBAY_APP_ID not configured');
 
-Search these sources in order (stop once you have 3+ prices):
-1. pricecharting.com — search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices
-2. TCGPlayer market price — search "tcgplayer.com ${classification.searchQuery} market price"
-3. Google Shopping sold data — search "${classification.searchQuery} sealed booster box sold price AUD"
-
-Filtering rules:
-- Only include prices for the EXACT same product format (sealed box ≠ singles ≠ cases)
-- Convert USD to AUD by multiplying by 1.55
-- Exclude obvious outliers (damaged, fake, "for parts")
-
-You MUST respond with ONLY this JSON — zero words before or after:
-{"cleanPrices":[<AUD numbers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`;
-
-  const userMessage = `Find market prices for: ${asset.title}
-Search term: ${classification.searchQuery}
-
-Search pricecharting.com first, then TCGPlayer, then general price searches. Return ONLY the JSON.`;
-
-  const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: userMessage },
-  ];
-
-  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }];
-
-  let response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1500,
-    system: systemPrompt,
-    tools: toolConfig,
-    messages,
+  const params = new URLSearchParams({
+    'OPERATION-NAME': 'findCompletedItems',
+    'SERVICE-VERSION': '1.0.0',
+    'SECURITY-APPNAME': appId,
+    'RESPONSE-DATA-FORMAT': 'JSON',
+    'GLOBAL-ID': globalId,
+    'keywords': query,
+    'itemFilter(0).name': 'SoldItemsOnly',
+    'itemFilter(0).value': 'true',
+    'sortOrder': 'EndTimeSoonest',
+    'paginationInput.entriesPerPage': '50',
   });
 
-  while (response.stop_reason === 'pause_turn') {
-    messages.push({ role: 'assistant', content: response.content });
-    response = await client.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 1500,
-      system: systemPrompt,
-      tools: toolConfig,
-      messages,
-    });
-  }
+  const res = await fetch(
+    `https://svcs.ebay.com/services/search/FindingService/v1?${params}`,
+    { next: { revalidate: 0 } },
+  );
+  if (!res.ok) throw new Error(`eBay API ${globalId} error: ${res.status}`);
 
-  const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+  const data = await res.json();
+  const items: unknown[] = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item ?? [];
+  const isAU = globalId === 'EBAY-AU';
 
-  let parsed: CompResult | null = null;
-  try {
-    parsed = JSON.parse(text.trim()) as CompResult;
-  } catch {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[0]) as CompResult;
-      } catch {
-        // fall through
-      }
-    }
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return items.flatMap((item: any) => {
+    const rawPrice = parseFloat(item?.sellingStatus?.[0]?.convertedCurrentPrice?.[0]?.['__value__'] ?? '0');
+    if (!rawPrice) return [];
+    const currency: string = item?.sellingStatus?.[0]?.convertedCurrentPrice?.[0]?.['@currencyId'] ?? '';
+    const priceAUD = (currency === 'USD' || !isAU) ? rawPrice * USD_TO_AUD : rawPrice;
+    return [{
+      title: (item?.title?.[0] as string) ?? '',
+      priceAUD,
+      endTime: (item?.listingInfo?.[0]?.endTime?.[0] as string) ?? '',
+    }];
+  });
+}
 
-  if (!parsed) {
-    return {
-      cleanPrices: [],
-      rawListingsFound: 0,
-      filteredOut: 0,
-      flaggedForReview: true,
-      flagReason: 'Could not extract pricing data from search results',
-    };
-  }
+function filterComps(items: EbayItem[], format: string): { clean: EbayItem[]; excluded: number } {
+  const rules = FORMAT_RULES[format] ?? {};
+  let excluded = 0;
 
-  return parsed;
+  const clean = items.filter((item) => {
+    const t = item.title.toLowerCase();
+
+    if (GLOBAL_EXCLUDES.some((kw) => t.includes(kw))) { excluded++; return false; }
+    if (rules.mustExclude?.some((kw) => t.includes(kw))) { excluded++; return false; }
+    if (rules.mustInclude && !rules.mustInclude.some((kw) => t.includes(kw))) { excluded++; return false; }
+    if (item.priceAUD < 1 || item.priceAUD > 1_000_000) { excluded++; return false; }
+
+    return true;
+  });
+
+  return { clean, excluded };
+}
+
+export async function searchAndExtractComps(
+  _asset: AssetInput,
+  classification: AssetClassification,
+): Promise<CompResult> {
+  // Search eBay AU first, fall back to eBay US if fewer than 3 results
+  const [auItems, usItems] = await Promise.all([
+    fetchSoldItems(classification.searchQuery, 'EBAY-AU').catch(() => [] as EbayItem[]),
+    fetchSoldItems(classification.searchQuery, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
+  ]);
+
+  const allItems = [
+    ...auItems,
+    // Only add US items not already covered by AU
+    ...(auItems.length < 5 ? usItems : []),
+  ];
+
+  const rawListingsFound = allItems.length;
+  const { clean, excluded } = filterComps(allItems, classification.format);
+
+  return {
+    cleanPrices: clean.map((i) => Math.round(i.priceAUD)),
+    rawListingsFound,
+    filteredOut: excluded,
+    flaggedForReview: clean.length < 3,
+    flagReason: clean.length < 3
+      ? `Only ${clean.length} comparable sale${clean.length !== 1 ? 's' : ''} found after filtering`
+      : undefined,
+  };
 }
