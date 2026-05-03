@@ -17,6 +17,8 @@ interface ValuationResult {
   flaggedForReview: boolean;
   flagReason?: string;
   currentValue: number | null;
+  rawListingsFound: number;
+  filteredOut: number;
 }
 
 const confidenceConfig = {
@@ -158,11 +160,14 @@ export default function ValuateButton({
             </div>
 
             {/* Comp stats */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-sm text-[#6A5A40]">
                 <CheckCircle2 className="h-4 w-4 text-[#1E5E38]" />
                 <span><strong className="text-[#1A1207]">{result.compCount}</strong> comparable sale{result.compCount !== 1 ? 's' : ''} used</span>
               </div>
+              <span className="text-xs text-[#8A7A60]">
+                {result.rawListingsFound} found · {result.filteredOut} filtered out
+              </span>
               {conf && (
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${conf.colour}`}>
                   {conf.label} confidence

@@ -49,6 +49,8 @@ export async function POST(
       flaggedForReview: valuation.flaggedForReview,
       flagReason: valuation.flagReason,
       currentValue: investment.currentValue ? Number(investment.currentValue) : null,
+      rawListingsFound: comps.rawListingsFound,
+      filteredOut: comps.filteredOut,
     });
   } catch (err) {
     console.error('[POST /api/investments/[id]/valuation]', err);
