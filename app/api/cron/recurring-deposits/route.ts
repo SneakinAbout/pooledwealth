@@ -107,3 +107,6 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ checked, advanced, missed, cancelled });
 }
+
+// cron-jobs.org sends GET by default — delegate to the same handler
+export { POST as GET };
