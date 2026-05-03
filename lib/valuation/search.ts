@@ -99,19 +99,39 @@ function filterComps(items: EbayItem[], format: string): { clean: EbayItem[]; ex
   return { clean, excluded };
 }
 
+// Strip filler words and return the N most distinctive tokens for a fallback query
+function trimQuery(query: string, maxWords = 4): string {
+  const fillers = new Set(['sealed', 'factory', 'tcg', 'trading', 'card', 'game', 'the', 'a', 'an', 'graded', 'raw', 'ungraded']);
+  const words = query.split(/\s+/).filter(w => !fillers.has(w.toLowerCase()));
+  return words.slice(0, maxWords).join(' ');
+}
+
 export async function searchAndExtractComps(
   _asset: AssetInput,
   classification: AssetClassification,
 ): Promise<CompResult> {
-  // Search eBay AU first, fall back to eBay US if fewer than 3 results
-  const [auItems, usItems] = await Promise.all([
-    fetchSoldItems(classification.searchQuery, 'EBAY-AU').catch(() => [] as EbayItem[]),
-    fetchSoldItems(classification.searchQuery, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
+  const query = classification.searchQuery;
+
+  // Search eBay AU + US in parallel with full query
+  let [auItems, usItems] = await Promise.all([
+    fetchSoldItems(query, 'EBAY-AU').catch(() => [] as EbayItem[]),
+    fetchSoldItems(query, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
   ]);
+
+  // If full query returns nothing, retry with a shorter 4-word version
+  if (auItems.length === 0 && usItems.length === 0) {
+    const short = trimQuery(query);
+    if (short !== query) {
+      console.log(`[eBay] Full query returned 0 — retrying with shortened query: "${short}"`);
+      [auItems, usItems] = await Promise.all([
+        fetchSoldItems(short, 'EBAY-AU').catch(() => [] as EbayItem[]),
+        fetchSoldItems(short, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
+      ]);
+    }
+  }
 
   const allItems = [
     ...auItems,
-    // Only add US items not already covered by AU
     ...(auItems.length < 5 ? usItems : []),
   ];
 

@@ -39,12 +39,14 @@ Return ONLY valid JSON in this exact shape:
 }
 
 Rules for searchQuery:
-- For graded cards: include grader + grade (e.g. "PSA 10 Charizard Base Set Unlimited")
-- For sealed products: include "sealed" and the exact product type (e.g. "sealed Base Set Booster Box")
-- For cases: include "sealed case" (e.g. "Pokemon Base Set Sealed Case")
-- For raw/ungraded cards: include "ungraded" or "raw" to exclude graded results
-- For sneakers: include size if known, brand, and model
-- For watches: include brand, model reference, and condition`;
+- Maximum 5 words — eBay AND-searches every word, so fewer is better
+- Use only the most distinctive identifiers: set name, product type, grade/grader if relevant
+- For graded cards: "PSA 10 Charizard Base Set" (grader + grade + card + set, no filler)
+- For sealed products: "Chaos Rising booster box" — skip "sealed", "TCG", "trading card game"
+- For cases: "Base Set sealed case"
+- For raw cards: "Charizard Base Set raw" — include "raw" to distinguish from graded
+- For sneakers: brand + model only (e.g. "Nike Dunk Low Panda")
+- For watches: brand + model ref (e.g. "Rolex Submariner 116610")`;
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5',
