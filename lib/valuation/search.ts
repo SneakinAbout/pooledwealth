@@ -56,7 +56,11 @@ async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem
     `&paginationInput.entriesPerPage=50`;
 
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`eBay API ${globalId} error: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[eBay ${globalId}] HTTP ${res.status} for query="${query}": ${body.slice(0, 300)}`);
+    throw new Error(`eBay ${globalId} HTTP ${res.status}`);
+  }
 
   const data = await res.json();
   const ack = data?.findCompletedItemsResponse?.[0]?.ack?.[0];
