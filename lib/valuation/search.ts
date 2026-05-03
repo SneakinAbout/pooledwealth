@@ -54,13 +54,16 @@ async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem
     'paginationInput.entriesPerPage': '50',
   });
 
-  const res = await fetch(
-    `https://svcs.ebay.com/services/search/FindingService/v1?${params}`,
-    { next: { revalidate: 0 } },
-  );
+  const url = `https://svcs.ebay.com/services/search/FindingService/v1?${params}`;
+  const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error(`eBay API ${globalId} error: ${res.status}`);
 
   const data = await res.json();
+  const ack = data?.findCompletedItemsResponse?.[0]?.ack?.[0];
+  const totalEntries = data?.findCompletedItemsResponse?.[0]?.paginationOutput?.[0]?.totalEntries?.[0];
+  const errorMsg = data?.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0]?.message?.[0];
+  console.log(`[eBay ${globalId}] query="${query}" ack=${ack} total=${totalEntries}${errorMsg ? ` error=${errorMsg}` : ''}`);
+
   const items: unknown[] = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item ?? [];
   const isAU = globalId === 'EBAY-AU';
 
