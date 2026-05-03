@@ -10,6 +10,7 @@ import DepositRejected from '../emails/templates/deposit-rejected';
 import WithdrawalApproved from '../emails/templates/withdrawal-approved';
 import WithdrawalRejected from '../emails/templates/withdrawal-rejected';
 import FeeOutstanding from '../emails/templates/fee-outstanding';
+import ValuationSummary, { type ValuationRow } from '../emails/templates/valuation-summary';
 import DistributionReceived from '../emails/templates/distribution-received';
 import SupplementFinalised from '../emails/templates/supplement-finalised';
 import InvestmentUpdate from '../emails/templates/investment-update';
@@ -127,4 +128,17 @@ export async function sendRecurringDepositCancelled(to: string, name: string, fr
   await send(to, `Your ${freqLabel} recurring deposit schedule has been cancelled`, html);
 }
 
-export type { DigestInvestment };
+export async function sendValuationSummary(
+  to: string,
+  name: string,
+  month: string,
+  rows: ValuationRow[],
+  updatedCount: number,
+  flaggedCount: number,
+  skippedCount: number,
+) {
+  const html = await render(ValuationSummary({ month, rows, updatedCount, flaggedCount, skippedCount }));
+  await send(to, `Monthly valuation report — ${month}`, html);
+}
+
+export type { DigestInvestment, ValuationRow };
