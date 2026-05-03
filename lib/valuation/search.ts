@@ -45,7 +45,7 @@ Return ONLY this JSON (no prose):
 
   // web_search_20250305 works on Haiku 4.5 (much cheaper than Sonnet).
   // It's a server-side tool — Anthropic executes it automatically; loop on pause_turn.
-  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search', max_uses: 1 }];
+  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 1 }];
 
   let response = await client.messages.create({
     model: 'claude-haiku-4-5',
