@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import ProgressBar from '@/components/ui/ProgressBar';
 import AdminInvestmentActions from './AdminInvestmentActions';
+import ValuateButton from './ValuateButton';
 import { formatCurrency, formatDate, calculateProgress } from '@/lib/utils';
 import { Plus, Users, Star } from 'lucide-react';
 import FeaturedToggle from './FeaturedToggle';
@@ -90,6 +91,7 @@ export default async function AdminInvestmentsPage() {
                   <Link href={`/manager/investments/${inv.id}/edit`}>
                     <Button variant="secondary" size="sm">Edit</Button>
                   </Link>
+                  <ValuateButton investmentId={inv.id} investmentTitle={inv.title} />
                   {!['ARCHIVED', 'EXITED', 'FAILED'].includes(inv.status) && (
                     <AdminInvestmentActions investmentId={inv.id} status={inv.status} />
                   )}
