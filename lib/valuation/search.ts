@@ -59,31 +59,19 @@ Search for eBay completed/sold listings. Extract all sold prices, convert to AUD
   ];
 
   let response = await client.messages.create({
-    model: 'claude-haiku-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2048,
     system: systemPrompt,
     tools: [{ type: 'web_search_20260209', name: 'web_search' }],
     messages,
   });
 
-  // Run the tool loop until end_turn
-  while (response.stop_reason === 'tool_use') {
-    const toolUseBlocks = response.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
-    );
-
+  // web_search_20260209 is a server-side tool — Anthropic executes it automatically.
+  // Loop on pause_turn (not tool_use) until end_turn; never inject tool results manually.
+  while (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content });
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = toolUseBlocks.map((tool) => ({
-      type: 'tool_result',
-      tool_use_id: tool.id,
-      content: 'Web search executed.',
-    }));
-
-    messages.push({ role: 'user', content: toolResults });
-
     response = await client.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
       tools: [{ type: 'web_search_20260209', name: 'web_search' }],
