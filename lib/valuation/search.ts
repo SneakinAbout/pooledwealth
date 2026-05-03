@@ -115,7 +115,7 @@ export async function searchAndExtractComps(
   // Search eBay AU + US in parallel with full query
   let [auItems, usItems] = await Promise.all([
     fetchSoldItems(query, 'EBAY-AU').catch(() => [] as EbayItem[]),
-    fetchSoldItems(query, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
+    fetchSoldItems(query, 'EBAY-US').catch(() => [] as EbayItem[]),
   ]);
 
   // If full query returns nothing, retry with a shorter 4-word version
@@ -125,7 +125,7 @@ export async function searchAndExtractComps(
       console.log(`[eBay] Full query returned 0 — retrying with shortened query: "${short}"`);
       [auItems, usItems] = await Promise.all([
         fetchSoldItems(short, 'EBAY-AU').catch(() => [] as EbayItem[]),
-        fetchSoldItems(short, 'EBAY-ENGL').catch(() => [] as EbayItem[]),
+        fetchSoldItems(short, 'EBAY-US').catch(() => [] as EbayItem[]),
       ]);
     }
   }
