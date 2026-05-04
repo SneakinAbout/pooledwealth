@@ -22,15 +22,17 @@ export async function searchAndExtractComps(
   // ── Step 1: search and collect raw price information ──────────────────────
   const searchMessages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Today is ${todayStr}. Search for: ${classification.searchQuery} price buy
+    content: `Today is ${todayStr}. Search for: ${classification.searchQuery} buy ebay.com.au pokevault
 
-You have exactly ONE search. After it completes, output ONLY a price list — no explanations, no "I need to search more", no commentary.
+You have exactly ONE search. Scan EVERY result on the page and list a price for each separate listing or retailer you see. Do not stop after the first one.
 
-Format every price found like:
-- $245.00 (TCGPlayer)
-- AUD $380 (eBay AU)
+Output ONLY a price list — one line per listing, no explanations:
+- AUD $355 (eBay AU — seller: cards4u)
+- AUD $340 (pokevault.com.au)
+- $220 USD (TCGPlayer)
+- AUD $380 (eBay AU — seller: ozpokemon)
 
-Include ALL prices: pre-order, market, buy-it-now, sealed box prices. If results are imperfect, still list every price you see.`,
+Include pre-order, market, and buy-it-now prices. If a result shows multiple listings at different prices, list each price separately.`,
   }];
 
   const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 1 }];

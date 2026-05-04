@@ -43,17 +43,18 @@ export function calculateValuation(
   const cleaned = removeOutliers(rawPrices);
   const compCount = cleaned.length;
 
-  if (compCount < 3) {
+  if (compCount < 2) {
     return {
       marketValue: compCount > 0 ? Math.round(median(cleaned) * 100) / 100 : null,
       confidence: 'insufficient',
       compCount,
       flaggedForReview: true,
-      flagReason: flagReason ?? `Only ${compCount} comparable sale${compCount === 1 ? '' : 's'} found`,
+      flagReason: flagReason ?? `Only ${compCount} comparable sale${compCount === 1 ? '' : 's'} found — manual review recommended`,
     };
   }
 
   const value = Math.round(median(cleaned) * 100) / 100;
+  // 2 comps → low (rare/new asset), 3-4 → low, 5-9 → medium, 10+ → high
   const confidence: Confidence =
     compCount >= 10 ? 'high' : compCount >= 5 ? 'medium' : 'low';
 
