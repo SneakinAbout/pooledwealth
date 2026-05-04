@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import type { AssetClassification, AssetInput } from './classify';
 
 export interface CompResult {
@@ -8,148 +9,97 @@ export interface CompResult {
   flagReason?: string;
 }
 
-const USD_TO_AUD = 1.55;
-
-// Bad-comp keywords that always disqualify a listing
-const GLOBAL_EXCLUDES = [
-  'damaged', 'fake', 'replica', 'for parts', 'not working', 'incomplete',
-  'altered', 'restored', 'reprint', 'custom', 'proxy',
-];
-
-// Format-specific inclusion/exclusion rules
-const FORMAT_RULES: Record<string, { mustInclude?: string[]; mustExclude?: string[] }> = {
-  booster_box:        { mustInclude: ['box'], mustExclude: ['case', ' pack ', 'single', 'lot of', 'bundle'] },
-  sealed_booster_box: { mustInclude: ['box'], mustExclude: ['case', ' pack ', 'single', 'lot of', 'bundle'] },
-  booster_pack:       { mustInclude: ['pack'], mustExclude: ['box', 'case', 'lot of', 'bundle'] },
-  sealed_case:        { mustInclude: ['case'], mustExclude: ['single', 'pack', 'lot of'] },
-  complete_set:       { mustExclude: ['incomplete', 'partial'] },
-  single_card_graded: { mustExclude: ['lot', 'bundle', 'case', 'box'] },
-  single_card_raw:    { mustExclude: ['psa', 'bgs', 'cgc', 'sgc', 'ace', 'lot', 'bundle', 'case', 'box'] },
-  sports_card_graded: { mustExclude: ['lot', 'bundle', 'case', 'box'] },
-  sports_card_raw:    { mustExclude: ['psa', 'bgs', 'cgc', 'sgc', 'lot', 'bundle'] },
-  sneakers:           { mustExclude: ['fake', 'replica', 'used', 'worn', 'display', 'lace'] },
-  watch:              { mustExclude: ['parts', 'repair', 'broken', 'replica', 'movement only'] },
-};
-
-interface EbayItem {
-  title: string;
-  priceAUD: number;
-  endTime: string;
-}
-
-async function fetchSoldItems(query: string, globalId: string): Promise<EbayItem[]> {
-  const appId = process.env.EBAY_APP_ID;
-  if (!appId) throw new Error('EBAY_APP_ID not configured');
-
-  // Build URL manually — URLSearchParams encodes ( ) to %28 %29 which eBay rejects
-  const url =
-    `https://svcs.ebay.com/services/search/FindingService/v1` +
-    `?OPERATION-NAME=findCompletedItems` +
-    `&SERVICE-VERSION=1.0.0` +
-    `&SECURITY-APPNAME=${encodeURIComponent(appId)}` +
-    `&RESPONSE-DATA-FORMAT=JSON` +
-    `&GLOBAL-ID=${globalId}` +
-    `&keywords=${encodeURIComponent(query)}` +
-    `&itemFilter(0).name=SoldItemsOnly` +
-    `&itemFilter(0).value=true` +
-    `&sortOrder=EndTimeSoonest` +
-    `&paginationInput.entriesPerPage=50`;
-
-  // Cache eBay results for 24h to avoid burning daily API call quota
-  const res = await fetch(url, { next: { revalidate: 86400 } });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`[eBay ${globalId}] HTTP ${res.status} for query="${query}": ${body.slice(0, 300)}`);
-    throw new Error(`eBay ${globalId} HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const ack = data?.findCompletedItemsResponse?.[0]?.ack?.[0];
-  const totalEntries = data?.findCompletedItemsResponse?.[0]?.paginationOutput?.[0]?.totalEntries?.[0];
-  const errorMsg = data?.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0]?.message?.[0];
-  console.log(`[eBay ${globalId}] query="${query}" ack=${ack} total=${totalEntries}${errorMsg ? ` error=${errorMsg}` : ''}`);
-
-  const items: unknown[] = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item ?? [];
-  const isAU = globalId === 'EBAY-AU';
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return items.flatMap((item: any) => {
-    const rawPrice = parseFloat(item?.sellingStatus?.[0]?.convertedCurrentPrice?.[0]?.['__value__'] ?? '0');
-    if (!rawPrice) return [];
-    const currency: string = item?.sellingStatus?.[0]?.convertedCurrentPrice?.[0]?.['@currencyId'] ?? '';
-    const priceAUD = (currency === 'USD' || !isAU) ? rawPrice * USD_TO_AUD : rawPrice;
-    return [{
-      title: (item?.title?.[0] as string) ?? '',
-      priceAUD,
-      endTime: (item?.listingInfo?.[0]?.endTime?.[0] as string) ?? '',
-    }];
-  });
-}
-
-function filterComps(items: EbayItem[], format: string): { clean: EbayItem[]; excluded: number } {
-  const rules = FORMAT_RULES[format] ?? {};
-  let excluded = 0;
-
-  const clean = items.filter((item) => {
-    const t = item.title.toLowerCase();
-
-    if (GLOBAL_EXCLUDES.some((kw) => t.includes(kw))) { excluded++; return false; }
-    if (rules.mustExclude?.some((kw) => t.includes(kw))) { excluded++; return false; }
-    if (rules.mustInclude && !rules.mustInclude.some((kw) => t.includes(kw))) { excluded++; return false; }
-    if (item.priceAUD < 1 || item.priceAUD > 1_000_000) { excluded++; return false; }
-
-    return true;
-  });
-
-  return { clean, excluded };
-}
-
-// Strip filler words and return the N most distinctive tokens for a fallback query
-function trimQuery(query: string, maxWords = 4): string {
-  const fillers = new Set(['sealed', 'factory', 'tcg', 'trading', 'card', 'game', 'the', 'a', 'an', 'graded', 'raw', 'ungraded']);
-  const words = query.split(/\s+/).filter(w => !fillers.has(w.toLowerCase()));
-  return words.slice(0, maxWords).join(' ');
-}
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function searchAndExtractComps(
-  _asset: AssetInput,
+  asset: AssetInput,
   classification: AssetClassification,
 ): Promise<CompResult> {
-  const query = classification.searchQuery;
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Search eBay AU + US in parallel with full query
-  let [auItems, usItems] = await Promise.all([
-    fetchSoldItems(query, 'EBAY-AU').catch(() => [] as EbayItem[]),
-    fetchSoldItems(query, 'EBAY-US').catch(() => [] as EbayItem[]),
-  ]);
+  const systemPrompt = `You are a collectible asset pricing specialist. Today is ${todayStr}.
 
-  // If full query returns nothing, retry with a shorter 4-word version
-  if (auItems.length === 0 && usItems.length === 0) {
-    const short = trimQuery(query);
-    if (short !== query) {
-      console.log(`[eBay] Full query returned 0 — retrying with shortened query: "${short}"`);
-      [auItems, usItems] = await Promise.all([
-        fetchSoldItems(short, 'EBAY-AU').catch(() => [] as EbayItem[]),
-        fetchSoldItems(short, 'EBAY-US').catch(() => [] as EbayItem[]),
-      ]);
+Find recent SOLD/MARKET prices for the asset below by searching price tracking sites. These sites publish real transaction data as static pages that you can read.
+
+Asset:
+- Title: ${asset.title}
+- Format: ${classification.format} (${classification.formatDescription})
+- Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\n- Edition: ${asset.edition}` : ''}
+
+Search strategy — try these in order until you have 3+ prices:
+1. PriceCharting: search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices for sealed products and cards
+2. TCGPlayer: search "site:tcgplayer.com ${classification.searchQuery} market price" — shows market prices for TCG products
+3. General sold price search: search "${classification.searchQuery} sold price AUD 2025 OR 2024 OR 2026"
+
+Filtering rules — only include prices matching the exact format:
+- Sealed booster box: box prices only, not singles/packs/cases
+- Graded card: exact grade + grader match (PSA 10 only if PSA 10 asset)
+- Raw card: ungraded only
+- Sneakers/watches: exact model, no fakes
+- Always exclude: lots, bundles, damaged, fakes
+
+Convert USD to AUD by multiplying by 1.55.
+
+Respond with ONLY this JSON — no text before or after:
+{"cleanPrices":[<AUD numbers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`;
+
+  const userMessage = `Find current market prices for: ${asset.title}
+Search: ${classification.searchQuery}
+Return ONLY the JSON.`;
+
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: userMessage },
+  ];
+
+  const toolConfig = [{
+    type: 'web_search_20250305' as const,
+    name: 'web_search' as const,
+    max_uses: 3,
+  }];
+
+  let response = await client.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 1024,
+    system: systemPrompt,
+    tools: toolConfig,
+    messages,
+  });
+
+  // Server-side tool: Anthropic runs the search automatically.
+  // Loop on pause_turn until end_turn — never inject tool results manually.
+  while (response.stop_reason === 'pause_turn') {
+    messages.push({ role: 'assistant', content: response.content });
+    response = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
+      system: systemPrompt,
+      tools: toolConfig,
+      messages,
+    });
+  }
+
+  const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+
+  let parsed: CompResult | null = null;
+  try {
+    parsed = JSON.parse(text.trim()) as CompResult;
+  } catch {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try { parsed = JSON.parse(jsonMatch[0]) as CompResult; } catch { /* fall through */ }
     }
   }
 
-  const allItems = [
-    ...auItems,
-    ...(auItems.length < 5 ? usItems : []),
-  ];
+  if (!parsed) {
+    return {
+      cleanPrices: [],
+      rawListingsFound: 0,
+      filteredOut: 0,
+      flaggedForReview: true,
+      flagReason: 'Could not extract pricing data from search results',
+    };
+  }
 
-  const rawListingsFound = allItems.length;
-  const { clean, excluded } = filterComps(allItems, classification.format);
-
-  return {
-    cleanPrices: clean.map((i) => Math.round(i.priceAUD)),
-    rawListingsFound,
-    filteredOut: excluded,
-    flaggedForReview: clean.length < 3,
-    flagReason: clean.length < 3
-      ? `Only ${clean.length} comparable sale${clean.length !== 1 ? 's' : ''} found after filtering`
-      : undefined,
-  };
+  return parsed;
 }
