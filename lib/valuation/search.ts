@@ -22,16 +22,14 @@ export async function searchAndExtractComps(
   // ── Step 1: search and collect raw price information ──────────────────────
   const searchMessages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Today is ${todayStr}. Find current market prices for:
+    content: `Today is ${todayStr}. Search for current prices of: ${classification.searchQuery}
 
-"${asset.title}"
-Format: ${classification.formatDescription}
+After searching, you MUST respond with a plain list of every price you found, like this:
+- $245.00 (TCGPlayer market)
+- $249.99 (pre-order, PokeVault)
+- AUD $380 (eBay Australia)
 
-Search for: ${classification.searchQuery} price
-
-Search multiple sources — pricecharting.com, tcgplayer.com, cardmarket.com, buylists, or any retail/resale site.
-Pre-order prices and current buy-it-now prices are valid.
-Collect every price you find and list them.`,
+Include pre-order prices and current buy-it-now prices. Do NOT summarise or explain — just list the prices with their source.`,
   }];
 
   const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }];
