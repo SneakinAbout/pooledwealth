@@ -80,7 +80,9 @@ Return ONLY the JSON.`;
   }
 
   const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+  console.log(`[valuation] stop_reason=${response.stop_reason} text_length=${text.length} preview="${text.slice(0, 200)}"`);
 
+  // If model returned prose instead of JSON, do a second pass to extract structured data
   let parsed: CompResult | null = null;
   try {
     parsed = JSON.parse(text.trim()) as CompResult;
@@ -88,6 +90,35 @@ Return ONLY the JSON.`;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try { parsed = JSON.parse(jsonMatch[0]) as CompResult; } catch { /* fall through */ }
+    }
+  }
+
+  // Second pass: ask the model to convert its prose answer to JSON
+  if (!parsed && text.length > 20) {
+    const extractResponse = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: `Extract pricing data from this text and return ONLY a JSON object with no other text:
+
+${text}
+
+Required JSON format:
+{"cleanPrices":[<AUD numbers only>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}
+
+If no prices were found, return: {"cleanPrices":[],"rawListingsFound":0,"filteredOut":0,"flaggedForReview":true,"flagReason":"No prices found in search results"}`,
+        },
+      ],
+    });
+    const extractText = extractResponse.content.find((b) => b.type === 'text')?.text ?? '';
+    console.log(`[valuation] extract pass: "${extractText.slice(0, 200)}"`);
+    try {
+      parsed = JSON.parse(extractText.trim()) as CompResult;
+    } catch {
+      const m = extractText.match(/\{[\s\S]*\}/);
+      if (m) try { parsed = JSON.parse(m[0]) as CompResult; } catch { /* fall through */ }
     }
   }
 
