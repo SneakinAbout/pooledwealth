@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import type { AssetClassification, AssetInput } from './classify';
 
 export interface CompResult {
@@ -9,114 +10,92 @@ export interface CompResult {
 }
 
 const USD_TO_AUD = 1.55;
-const HEADERS = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' };
-
-const PRODUCT_SLUGS: Record<string, string> = {
-  booster_box: 'booster-box',
-  sealed_booster_box: 'booster-box',
-  booster_pack: 'booster-pack',
-  sealed_case: 'sealed-case',
-  complete_set: 'complete-set',
-  single_card_raw: '',      // handled differently
-  single_card_graded: '',
-};
-
-const STRIP_WORDS = new Set([
-  'pokemon', 'tcg', 'trading', 'card', 'game', 'sealed', 'factory',
-  'booster', 'box', 'pack', 'case', 'set', 'complete', 'graded',
-  'english', 'japanese', 'korean', 'chinese', 'the', 'a', 'an',
-]);
-
-function toSlug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-// Extract all js-price values from PriceCharting HTML
-function parsePrices(html: string): number[] {
-  const re = /class="[^"]*js-price[^"]*"[^>]*>\s*\$([\d,]+\.?\d*)/g;
-  const out: number[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const p = parseFloat(m[1].replace(/,/g, ''));
-    if (p > 1) out.push(p);
-  }
-  return out;
-}
-
-// Try fetching a PriceCharting URL and return prices (empty = not found / no prices)
-async function tryPriceChartingUrl(url: string): Promise<number[]> {
-  try {
-    const res = await fetch(url, { headers: HEADERS, cache: 'no-store' });
-    console.log(`[PC] ${url} → HTTP ${res.status}`);
-    if (!res.ok) return [];
-    const html = await res.text();
-    const prices = parsePrices(html);
-    console.log(`[PC] parsed ${prices.length} prices: ${prices.slice(0, 5).join(', ')}`);
-    return prices;
-  } catch (err) {
-    console.error(`[PC] fetch error for ${url}: ${err}`);
-    return [];
-  }
-}
-
-// Build URL slug candidates from fewest to most words,
-// starting from the END of the set name (most specific part)
-function buildCandidates(searchQuery: string, productSlug: string): string[] {
-  const words = searchQuery.split(/\s+/).filter(w => !STRIP_WORDS.has(w.toLowerCase()));
-  const candidates: string[] = [];
-  // Try from the end: last 2 words, last 3, last 4, full
-  for (let n = 2; n <= words.length; n++) {
-    const slug = toSlug(words.slice(words.length - n).join(' '));
-    candidates.push(`https://www.pricecharting.com/game/pokemon-${slug}/${productSlug}`);
-  }
-  // Also try full slug without "pokemon-" prefix (some non-Pokemon items)
-  const fullSlug = toSlug(words.join(' '));
-  candidates.push(`https://www.pricecharting.com/game/${fullSlug}/${productSlug}`);
-  return candidates;
-}
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function searchAndExtractComps(
-  _asset: AssetInput,
+  asset: AssetInput,
   classification: AssetClassification,
 ): Promise<CompResult> {
-  const productSlug = PRODUCT_SLUGS[classification.format];
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Try PriceCharting for supported formats
-  if (productSlug) {
-    // Check hint from classify first
-    if (classification.priceChartingPath) {
-      const hintUrl = `https://www.pricecharting.com/game/${classification.priceChartingPath}`;
-      const prices = await tryPriceChartingUrl(hintUrl);
-      if (prices.length > 0) return toResult(prices);
-    }
+  // ── Step 1: search and collect raw price information ──────────────────────
+  const searchMessages: Anthropic.MessageParam[] = [{
+    role: 'user',
+    content: `Today is ${todayStr}. Find current market prices for:
 
-    // Try constructed URL candidates
-    const candidates = buildCandidates(classification.searchQuery, productSlug);
-    for (const url of candidates) {
-      const prices = await tryPriceChartingUrl(url);
-      if (prices.length > 0) return toResult(prices);
-    }
+"${asset.title}"
+Format: ${classification.formatDescription}
+
+Search for: ${classification.searchQuery} price
+
+Search multiple sources — pricecharting.com, tcgplayer.com, cardmarket.com, buylists, or any retail/resale site.
+Pre-order prices and current buy-it-now prices are valid.
+Collect every price you find and list them.`,
+  }];
+
+  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }];
+
+  let searchResponse = await client.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 1024,
+    tools: toolConfig,
+    messages: searchMessages,
+  });
+
+  while (searchResponse.stop_reason === 'pause_turn') {
+    searchMessages.push({ role: 'assistant', content: searchResponse.content });
+    searchResponse = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
+      tools: toolConfig,
+      messages: searchMessages,
+    });
   }
 
-  console.log(`[search] No PriceCharting data found for "${classification.searchQuery}"`);
-  return {
-    cleanPrices: [],
-    rawListingsFound: 0,
-    filteredOut: 0,
-    flaggedForReview: true,
-    flagReason: 'No pricing data found — manual valuation required',
-  };
+  const searchText = searchResponse.content.find((b) => b.type === 'text')?.text ?? '';
+  console.log(`[search] found text (${searchText.length} chars): ${searchText.slice(0, 300)}`);
+
+  if (!searchText || searchText.length < 20) {
+    return noData('Search returned no results');
+  }
+
+  // ── Step 2: extract structured JSON from the prose response ───────────────
+  const extractResponse = await client.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 512,
+    messages: [{
+      role: 'user',
+      content: `Extract all prices from the text below for "${asset.title}" (${classification.formatDescription}).
+
+Rules:
+- Convert USD to AUD by multiplying by ${USD_TO_AUD}
+- Include pre-order prices, market prices, buy-it-now prices
+- Exclude prices for wrong format (e.g. single cards when asset is a booster box)
+- Round to whole numbers
+
+Text:
+${searchText}
+
+Return ONLY this JSON (no other text):
+{"cleanPrices":[<AUD integers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`,
+    }],
+  });
+
+  const extractText = extractResponse.content.find((b) => b.type === 'text')?.text ?? '';
+  console.log(`[extract] ${extractText.slice(0, 200)}`);
+
+  let parsed: CompResult | null = null;
+  try {
+    parsed = JSON.parse(extractText.trim()) as CompResult;
+  } catch {
+    const m = extractText.match(/\{[\s\S]*\}/);
+    if (m) try { parsed = JSON.parse(m[0]) as CompResult; } catch { /* fall through */ }
+  }
+
+  return parsed ?? noData('Could not parse price data');
 }
 
-function toResult(usdPrices: number[]): CompResult {
-  const audPrices = usdPrices.map(p => Math.round(p * USD_TO_AUD));
-  return {
-    cleanPrices: audPrices,
-    rawListingsFound: usdPrices.length,
-    filteredOut: 0,
-    flaggedForReview: audPrices.length < 3,
-    flagReason: audPrices.length < 3
-      ? `Only ${audPrices.length} price${audPrices.length !== 1 ? 's' : ''} found`
-      : undefined,
-  };
+function noData(reason: string): CompResult {
+  return { cleanPrices: [], rawListingsFound: 0, filteredOut: 0, flaggedForReview: true, flagReason: reason };
 }
