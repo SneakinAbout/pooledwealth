@@ -4,6 +4,7 @@ export interface AssetClassification {
   format: string;
   searchQuery: string;
   formatDescription: string;
+  priceChartingPath?: string; // e.g. "pokemon-chaos-rising/booster-box"
 }
 
 export interface AssetInput {
@@ -34,19 +35,20 @@ ${asset.certNumber ? `- Cert number: ${asset.certNumber}` : ''}
 Return ONLY valid JSON in this exact shape:
 {
   "format": "<one of: single_card_graded | single_card_raw | booster_pack | booster_box | sealed_case | complete_set | sealed_product | memorabilia | collectible_figure | sports_card_graded | sports_card_raw | comic_book | sneakers | watch | art | wine | whisky | other>",
-  "searchQuery": "<the exact eBay search query to find comparable sold listings — be specific, include grade/company/edition if relevant, keep under 80 chars>",
-  "formatDescription": "<one sentence describing what this asset is, e.g. 'PSA 10 graded Pokemon card' or 'factory sealed booster box'>"
+  "searchQuery": "<specific web search query to find this product on PriceCharting or TCGPlayer — include set name + product type, keep under 10 words>",
+  "formatDescription": "<one sentence describing what this asset is>",
+  "priceChartingPath": "<the PriceCharting URL path after /game/ — e.g. 'pokemon-chaos-rising/booster-box' or 'pokemon-base-set/charizard' — use null if unsure>"
 }
 
-Rules for searchQuery — this is used for a WEB SEARCH (Google), not eBay API, so be specific:
-- Include enough detail to find the exact product on price-tracking sites like PriceCharting or TCGPlayer
-- Include the product format so results match the right item type
-- For Pokemon sealed products: include set name + product type (e.g. "Pokemon Mega Evolution Chaos Rising booster box")
-- For graded cards: include grader + grade + card name + set (e.g. "PSA 10 Charizard Base Set booster box")
-- For sneakers: include brand + full model name (e.g. "Nike Air Jordan 1 Retro High OG Chicago")
-- For watches: include brand + model + reference number (e.g. "Rolex Submariner Date 116610LN")
-- DO include format words like "booster box", "sealed case", "graded" — they help find the right product page
-- Keep under 10 words total`;
+PriceCharting URL format rules:
+- Base URL is https://www.pricecharting.com/game/[path]
+- Pokemon sealed: "pokemon-[set-name-hyphenated]/booster-box" or "/sealed-case" or "/booster-pack"
+- Pokemon cards: "pokemon-[set-name]/[card-name-hyphenated]"
+- Graded cards append the grade: "pokemon-base-set/charizard?q=psa+10" (use null, graded lookup is complex)
+- Sneakers: "shoes/[brand-model-hyphenated]"
+- Video games: "[console]/[game-name]"
+- Set name format: hyphenate, lowercase, no special chars (e.g. "Chaos Rising" → "chaos-rising", "Base Set" → "base-set")
+- If you are not confident in the exact path, return null`;
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5',
