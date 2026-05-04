@@ -22,17 +22,18 @@ export async function searchAndExtractComps(
   // ── Step 1: search and collect raw price information ──────────────────────
   const searchMessages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Today is ${todayStr}. Search for current prices of: ${classification.searchQuery}
+    content: `Today is ${todayStr}. Search for: ${classification.searchQuery} price buy
 
-After searching, you MUST respond with a plain list of every price you found, like this:
-- $245.00 (TCGPlayer market)
-- $249.99 (pre-order, PokeVault)
-- AUD $380 (eBay Australia)
+You have exactly ONE search. After it completes, output ONLY a price list — no explanations, no "I need to search more", no commentary.
 
-Include pre-order prices and current buy-it-now prices. Do NOT summarise or explain — just list the prices with their source.`,
+Format every price found like:
+- $245.00 (TCGPlayer)
+- AUD $380 (eBay AU)
+
+Include ALL prices: pre-order, market, buy-it-now, sealed box prices. If results are imperfect, still list every price you see.`,
   }];
 
-  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }];
+  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 1 }];
 
   let searchResponse = await client.messages.create({
     model: 'claude-haiku-4-5',
@@ -41,7 +42,14 @@ Include pre-order prices and current buy-it-now prices. Do NOT summarise or expl
     messages: searchMessages,
   });
 
+  // Collect text from ALL turns (intermediate + final) so we don't miss prices
+  // that appear before the model's concluding statement
+  const allTextParts: string[] = [];
+
   while (searchResponse.stop_reason === 'pause_turn') {
+    for (const block of searchResponse.content) {
+      if (block.type === 'text' && block.text.trim()) allTextParts.push(block.text);
+    }
     searchMessages.push({ role: 'assistant', content: searchResponse.content });
     searchResponse = await client.messages.create({
       model: 'claude-haiku-4-5',
@@ -51,10 +59,14 @@ Include pre-order prices and current buy-it-now prices. Do NOT summarise or expl
     });
   }
 
-  const searchText = searchResponse.content.find((b) => b.type === 'text')?.text ?? '';
-  console.log(`[search] found text (${searchText.length} chars): ${searchText.slice(0, 300)}`);
+  for (const block of searchResponse.content) {
+    if (block.type === 'text' && block.text.trim()) allTextParts.push(block.text);
+  }
 
-  if (!searchText || searchText.length < 20) {
+  const searchText = allTextParts.join('\n\n');
+  console.log(`[search] found text (${searchText.length} chars): ${searchText.slice(0, 400)}`);
+
+  if (!searchText || searchText.length < 10) {
     return noData('Search returned no results');
   }
 
@@ -64,18 +76,19 @@ Include pre-order prices and current buy-it-now prices. Do NOT summarise or expl
     max_tokens: 512,
     messages: [{
       role: 'user',
-      content: `Extract all prices from the text below for "${asset.title}" (${classification.formatDescription}).
+      content: `Extract prices from the text below. Asset: "${asset.title}" (${classification.formatDescription}).
 
 Rules:
-- Convert USD to AUD by multiplying by ${USD_TO_AUD}
-- Include pre-order prices, market prices, buy-it-now prices
-- Exclude prices for wrong format (e.g. single cards when asset is a booster box)
+- Convert USD→AUD by multiplying by ${USD_TO_AUD}
+- Include pre-order, market, buy-it-now, and sealed product prices
+- Exclude obviously wrong formats (e.g. single cards when looking for a booster box)
 - Round to whole numbers
+- Extract ANY prices present even if the text is incomplete or imperfect
 
 Text:
 ${searchText}
 
-Return ONLY this JSON (no other text):
+Return ONLY this JSON (no markdown, no explanation):
 {"cleanPrices":[<AUD integers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`,
     }],
   });
