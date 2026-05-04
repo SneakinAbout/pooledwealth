@@ -13,43 +13,105 @@ const USD_TO_AUD = 1.55;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ---------------------------------------------------------------------------
-// Step 1: Use web search to find the right PriceCharting URL
+// Step 1: Find PriceCharting URL — try constructed slugs, then web search
 // ---------------------------------------------------------------------------
 
-async function findPriceChartingUrl(searchQuery: string): Promise<string | null> {
+const PRODUCT_TYPE_SLUGS: Record<string, string> = {
+  booster_box: 'booster-box',
+  sealed_booster_box: 'booster-box',
+  booster_pack: 'booster-pack',
+  sealed_case: 'sealed-case',
+  complete_set: 'complete-set',
+};
+
+// Strip common filler words to derive the set name portion
+const STRIP_WORDS = new Set([
+  'pokemon', 'tcg', 'trading', 'card', 'game', 'sealed', 'factory',
+  'booster', 'box', 'pack', 'case', 'set', 'complete', 'graded',
+  'english', 'japanese', 'korean', 'chinese',
+]);
+
+function toSlug(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+
+async function tryFetchUrl(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; valuation-bot/1.0)' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function findPriceChartingUrl(
+  searchQuery: string,
+  format: string,
+  hintPath?: string,
+): Promise<string | null> {
+  const productSlug = PRODUCT_TYPE_SLUGS[format];
+  const base = 'https://www.pricecharting.com/game';
+
+  // 1. Use hint from classify if provided
+  if (hintPath) {
+    const url = `${base}/${hintPath}`;
+    if (await tryFetchUrl(url)) {
+      console.log(`[findPriceChartingUrl] hint path works: ${url}`);
+      return url;
+    }
+  }
+
+  // 2. Construct URL candidates from search query words
+  if (productSlug) {
+    const words = searchQuery.split(/\s+/).filter(w => !STRIP_WORDS.has(w.toLowerCase()));
+    // Try progressively shorter set-name slugs (e.g. all words → drop first → drop last)
+    const candidates: string[] = [];
+    for (let len = words.length; len >= 1; len--) {
+      candidates.push(`pokemon-${toSlug(words.slice(0, len).join(' '))}/${productSlug}`);
+      if (len !== words.length) {
+        candidates.push(`pokemon-${toSlug(words.slice(words.length - len).join(' '))}/${productSlug}`);
+      }
+    }
+
+    const seen = new Set<string>();
+    const unique = candidates.filter(c => !seen.has(c) && seen.add(c));
+    for (const path of unique) {
+      const url = `${base}/${path}`;
+      if (await tryFetchUrl(url)) {
+        console.log(`[findPriceChartingUrl] constructed URL works: ${url}`);
+        return url;
+      }
+    }
+  }
+
+  // 3. Fall back to web search
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Search for this exact query and return ONLY the first pricecharting.com URL you find — nothing else, just the URL:
-
-site:pricecharting.com ${searchQuery}
-
-Return ONLY the URL like: https://www.pricecharting.com/game/...
-If no pricecharting.com URL is found, return: null`,
+    content: `Search: site:pricecharting.com ${searchQuery}
+Return ONLY the first pricecharting.com/game/ URL found, or "null" if none.`,
   }];
 
   const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 1 }];
-
   let response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 256,
-    tools: toolConfig,
-    messages,
+    model: 'claude-haiku-4-5', max_tokens: 128, tools: toolConfig, messages,
   });
-
   while (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content });
     response = await client.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 256,
-      tools: toolConfig,
-      messages,
+      model: 'claude-haiku-4-5', max_tokens: 128, tools: toolConfig, messages,
     });
   }
-
-  const text = response.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
-  const urlMatch = text.match(/https:\/\/www\.pricecharting\.com\/game\/[^\s"'<>]+/);
-  const url = urlMatch?.[0] ?? null;
-  console.log(`[findPriceChartingUrl] query="${searchQuery}" → ${url}`);
+  const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+  const match = text.match(/https:\/\/www\.pricecharting\.com\/game\/[^\s"'<>]+/);
+  const url = match?.[0] ?? null;
+  console.log(`[findPriceChartingUrl] web search fallback → ${url}`);
   return url;
 }
 
@@ -90,8 +152,12 @@ export async function searchAndExtractComps(
   asset: AssetInput,
   classification: AssetClassification,
 ): Promise<CompResult> {
-  // Step 1: find the PriceCharting URL via web search
-  const pcUrl = await findPriceChartingUrl(classification.searchQuery).catch(() => null);
+  // Step 1: find the PriceCharting URL
+  const pcUrl = await findPriceChartingUrl(
+    classification.searchQuery,
+    classification.format,
+    classification.priceChartingPath ?? undefined,
+  ).catch(() => null);
 
   // Step 2: if found, fetch the page and parse prices
   if (pcUrl) {
