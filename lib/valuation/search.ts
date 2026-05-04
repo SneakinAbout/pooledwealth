@@ -46,12 +46,15 @@ function parsePrices(html: string): number[] {
 // Try fetching a PriceCharting URL and return prices (empty = not found / no prices)
 async function tryPriceChartingUrl(url: string): Promise<number[]> {
   try {
-    const res = await fetch(url, { headers: HEADERS, next: { revalidate: 86400 } } as RequestInit);
+    const res = await fetch(url, { headers: HEADERS, cache: 'no-store' });
+    console.log(`[PC] ${url} → HTTP ${res.status}`);
     if (!res.ok) return [];
-    const prices = parsePrices(await res.text());
-    console.log(`[PC] ${url} → ${prices.length} prices`);
+    const html = await res.text();
+    const prices = parsePrices(html);
+    console.log(`[PC] parsed ${prices.length} prices: ${prices.slice(0, 5).join(', ')}`);
     return prices;
-  } catch {
+  } catch (err) {
+    console.error(`[PC] fetch error for ${url}: ${err}`);
     return [];
   }
 }
