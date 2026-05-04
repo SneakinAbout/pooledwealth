@@ -27,14 +27,16 @@ Asset:
 - Format: ${classification.format} (${classification.formatDescription})
 - Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\n- Edition: ${asset.edition}` : ''}
 
-IMPORTANT: This asset already EXISTS and has been owned as an investment with an existing value of ${asset.category}. You are looking for its CURRENT MARKET VALUE based on recent sales — NOT news about upcoming releases or pre-orders.
-
 Search strategy — try these in order until you have 3+ prices:
-1. PriceCharting: search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices
-2. TCGPlayer: search "tcgplayer.com ${classification.searchQuery} market price"
-3. General price history: search "${classification.searchQuery} price history sold 2024 2025"
+1. PriceCharting: search "site:pricecharting.com ${classification.searchQuery}" — shows historical and current sold prices
+2. TCGPlayer: search "tcgplayer.com ${classification.searchQuery} market price" — shows current market prices
+3. General price search: search "${classification.searchQuery} price sold buy"
 
-If results show a NEW upcoming product with the same name, IGNORE those — search more specifically for the existing product's price history by adding the year it was originally released or "price history" to your search.
+IMPORTANT notes:
+- If the product is a new/upcoming release, PRE-ORDER SOLD PRICES are valid market data — include them
+- Pre-orders that have actually sold (completed transactions) count as comparable sales
+- Search for current buy prices, pre-order prices, and any completed sales you can find
+- Do NOT skip a product just because it is newly released or in pre-order phase
 
 Filtering rules — only include prices matching the exact format:
 - Sealed booster box: box prices only, not singles/packs/cases
