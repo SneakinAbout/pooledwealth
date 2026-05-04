@@ -38,15 +38,15 @@ Return ONLY valid JSON in this exact shape:
   "formatDescription": "<one sentence describing what this asset is, e.g. 'PSA 10 graded Pokemon card' or 'factory sealed booster box'>"
 }
 
-Rules for searchQuery:
-- MAXIMUM 3 WORDS — eBay AND-searches every word, shorter queries return far more results
-- Use only the most distinctive product identifiers — brand + name only, NO format words
-- DO NOT include: "sealed", "booster", "box", "pack", "case", "graded", "raw", "TCG", "trading card game"
-- For Pokemon sealed products: "Pokemon Chaos Rising" (brand + set name only)
-- For graded cards: "PSA 10 Charizard" (grader + grade + card name, skip set name if already 3 words)
-- For sneakers: "Nike Dunk Panda" (brand + model)
-- For watches: "Rolex Submariner 116610" (brand + model ref)
-- The format filtering happens separately — do not include format terms in the query`;
+Rules for searchQuery — this is used for a WEB SEARCH (Google), not eBay API, so be specific:
+- Include enough detail to find the exact product on price-tracking sites like PriceCharting or TCGPlayer
+- Include the product format so results match the right item type
+- For Pokemon sealed products: include set name + product type (e.g. "Pokemon Mega Evolution Chaos Rising booster box")
+- For graded cards: include grader + grade + card name + set (e.g. "PSA 10 Charizard Base Set booster box")
+- For sneakers: include brand + full model name (e.g. "Nike Air Jordan 1 Retro High OG Chicago")
+- For watches: include brand + model + reference number (e.g. "Rolex Submariner Date 116610LN")
+- DO include format words like "booster box", "sealed case", "graded" — they help find the right product page
+- Keep under 10 words total`;
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5',

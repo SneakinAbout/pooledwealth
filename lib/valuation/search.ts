@@ -27,10 +27,14 @@ Asset:
 - Format: ${classification.format} (${classification.formatDescription})
 - Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}${asset.edition ? `\n- Edition: ${asset.edition}` : ''}
 
+IMPORTANT: This asset already EXISTS and has been owned as an investment with an existing value of ${asset.category}. You are looking for its CURRENT MARKET VALUE based on recent sales — NOT news about upcoming releases or pre-orders.
+
 Search strategy — try these in order until you have 3+ prices:
-1. PriceCharting: search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices for sealed products and cards
-2. TCGPlayer: search "site:tcgplayer.com ${classification.searchQuery} market price" — shows market prices for TCG products
-3. General sold price search: search "${classification.searchQuery} sold price AUD 2025 OR 2024 OR 2026"
+1. PriceCharting: search "site:pricecharting.com ${classification.searchQuery}" — shows historical sold prices
+2. TCGPlayer: search "tcgplayer.com ${classification.searchQuery} market price"
+3. General price history: search "${classification.searchQuery} price history sold 2024 2025"
+
+If results show a NEW upcoming product with the same name, IGNORE those — search more specifically for the existing product's price history by adding the year it was originally released or "price history" to your search.
 
 Filtering rules — only include prices matching the exact format:
 - Sealed booster box: box prices only, not singles/packs/cases
