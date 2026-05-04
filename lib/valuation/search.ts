@@ -35,7 +35,8 @@ Include pre-order and buy-it-now prices. No explanations — prices only.`,
 
   let searchResponse = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 1024,
+    max_tokens: 2048,
+    temperature: 0,
     tools: toolConfig,
     messages: searchMessages,
   });
@@ -51,7 +52,8 @@ Include pre-order and buy-it-now prices. No explanations — prices only.`,
     searchMessages.push({ role: 'assistant', content: searchResponse.content });
     searchResponse = await client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 1024,
+      max_tokens: 2048,
+      temperature: 0,
       tools: toolConfig,
       messages: searchMessages,
     });
@@ -72,6 +74,7 @@ Include pre-order and buy-it-now prices. No explanations — prices only.`,
   const extractResponse = await client.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 512,
+    temperature: 0,
     messages: [{
       role: 'user',
       content: `Extract prices from the text below. Asset: "${asset.title}" (${classification.formatDescription}).
