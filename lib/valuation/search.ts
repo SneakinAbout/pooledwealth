@@ -13,74 +13,25 @@ const USD_TO_AUD = 1.55;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ---------------------------------------------------------------------------
-// PriceCharting direct fetch
+// Step 1: Use web search to find the right PriceCharting URL
 // ---------------------------------------------------------------------------
 
-async function fetchPriceCharting(path: string): Promise<number[]> {
-  const url = `https://www.pricecharting.com/game/${path}`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; valuation-bot/1.0)' },
-    next: { revalidate: 86400 },
-  });
+async function findPriceChartingUrl(searchQuery: string): Promise<string | null> {
+  const messages: Anthropic.MessageParam[] = [{
+    role: 'user',
+    content: `Search for this exact query and return ONLY the first pricecharting.com URL you find — nothing else, just the URL:
 
-  if (!res.ok) {
-    console.log(`[PriceCharting] HTTP ${res.status} for ${path}`);
-    return [];
-  }
+site:pricecharting.com ${searchQuery}
 
-  const html = await res.text();
+Return ONLY the URL like: https://www.pricecharting.com/game/...
+If no pricecharting.com URL is found, return: null`,
+  }];
 
-  // Extract all js-price span values (these are real transaction prices on the page)
-  const priceRegex = /<span[^>]*class="[^"]*js-price[^"]*"[^>]*>\s*\$([\d,]+\.?\d*)\s*</g;
-  const prices: number[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = priceRegex.exec(html)) !== null) {
-    const p = parseFloat(m[1].replace(/,/g, ''));
-    if (p > 0) prices.push(p);
-  }
-
-  console.log(`[PriceCharting] ${path} → ${prices.length} prices: ${prices.slice(0, 5).join(', ')}`);
-  return prices;
-}
-
-// ---------------------------------------------------------------------------
-// Web search fallback (Anthropic web_search_20250305)
-// ---------------------------------------------------------------------------
-
-async function fetchViaWebSearch(
-  asset: AssetInput,
-  classification: AssetClassification,
-): Promise<CompResult> {
-  const now = new Date();
-  const todayStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  const systemPrompt = `You are a collectible asset pricing specialist. Today is ${todayStr}.
-
-Find current market prices for the asset below. Search price-tracking sites and return ONLY a JSON object.
-
-Asset:
-- Title: ${asset.title}
-- Format: ${classification.format} (${classification.formatDescription})
-- Category: ${asset.category}${asset.grade ? `\n- Grade: ${asset.grade}` : ''}${asset.gradingCompany ? ` (${asset.gradingCompany})` : ''}
-
-Search: "site:pricecharting.com ${classification.searchQuery}" then "tcgplayer.com ${classification.searchQuery} market price"
-
-If the product is a new/upcoming release, pre-order sold prices are valid market data — include them.
-Convert USD to AUD ×1.55.
-
-Respond with ONLY this JSON — no text before or after:
-{"cleanPrices":[<AUD numbers>],"rawListingsFound":<int>,"filteredOut":<int>,"flaggedForReview":<bool>,"flagReason":<string or null>}`;
-
-  const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: `Find prices for: ${asset.title}. Return ONLY the JSON.` },
-  ];
-
-  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }];
+  const toolConfig = [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 1 }];
 
   let response = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    system: systemPrompt,
+    max_tokens: 256,
     tools: toolConfig,
     messages,
   });
@@ -89,26 +40,46 @@ Respond with ONLY this JSON — no text before or after:
     messages.push({ role: 'assistant', content: response.content });
     response = await client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 1024,
-      system: systemPrompt,
+      max_tokens: 256,
       tools: toolConfig,
       messages,
     });
   }
 
-  const text = response.content.find((b) => b.type === 'text')?.text ?? '';
-  console.log(`[webSearch] stop_reason=${response.stop_reason} preview="${text.slice(0, 150)}"`);
+  const text = response.content.find((b) => b.type === 'text')?.text?.trim() ?? '';
+  const urlMatch = text.match(/https:\/\/www\.pricecharting\.com\/game\/[^\s"'<>]+/);
+  const url = urlMatch?.[0] ?? null;
+  console.log(`[findPriceChartingUrl] query="${searchQuery}" → ${url}`);
+  return url;
+}
 
-  let parsed: CompResult | null = null;
-  try { parsed = JSON.parse(text.trim()) as CompResult; } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (m) try { parsed = JSON.parse(m[0]) as CompResult; } catch { /* fall through */ }
+// ---------------------------------------------------------------------------
+// Step 2: Fetch PriceCharting page and extract js-price values
+// ---------------------------------------------------------------------------
+
+async function fetchPriceCharting(url: string): Promise<number[]> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; valuation-bot/1.0)' },
+    next: { revalidate: 86400 },
+  });
+
+  if (!res.ok) {
+    console.log(`[PriceCharting] HTTP ${res.status} for ${url}`);
+    return [];
   }
 
-  return parsed ?? {
-    cleanPrices: [], rawListingsFound: 0, filteredOut: 0,
-    flaggedForReview: true, flagReason: 'Web search returned no structured data',
-  };
+  const html = await res.text();
+
+  const priceRegex = /<span[^>]*class="[^"]*js-price[^"]*"[^>]*>\s*\$([\d,]+\.?\d*)\s*</g;
+  const prices: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = priceRegex.exec(html)) !== null) {
+    const p = parseFloat(m[1].replace(/,/g, ''));
+    if (p > 0) prices.push(p);
+  }
+
+  console.log(`[PriceCharting] ${url} → ${prices.length} prices found, sample: ${prices.slice(0, 5).join(', ')}`);
+  return prices;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,9 +90,12 @@ export async function searchAndExtractComps(
   asset: AssetInput,
   classification: AssetClassification,
 ): Promise<CompResult> {
-  // 1. Try PriceCharting direct fetch if we have a path
-  if (classification.priceChartingPath) {
-    const usdPrices = await fetchPriceCharting(classification.priceChartingPath).catch(() => [] as number[]);
+  // Step 1: find the PriceCharting URL via web search
+  const pcUrl = await findPriceChartingUrl(classification.searchQuery).catch(() => null);
+
+  // Step 2: if found, fetch the page and parse prices
+  if (pcUrl) {
+    const usdPrices = await fetchPriceCharting(pcUrl).catch(() => [] as number[]);
     if (usdPrices.length > 0) {
       const audPrices = usdPrices.map(p => Math.round(p * USD_TO_AUD));
       return {
@@ -129,12 +103,22 @@ export async function searchAndExtractComps(
         rawListingsFound: usdPrices.length,
         filteredOut: 0,
         flaggedForReview: audPrices.length < 3,
-        flagReason: audPrices.length < 3 ? `Only ${audPrices.length} price${audPrices.length !== 1 ? 's' : ''} found on PriceCharting` : undefined,
+        flagReason: audPrices.length < 3
+          ? `Only ${audPrices.length} price${audPrices.length !== 1 ? 's' : ''} found on PriceCharting`
+          : undefined,
       };
     }
-    console.log(`[PriceCharting] No prices found for path "${classification.priceChartingPath}" — falling back to web search`);
   }
 
-  // 2. Fall back to web search
-  return fetchViaWebSearch(asset, classification);
+  // Step 3: no PriceCharting data — flag for manual review
+  console.log(`[search] No PriceCharting data for "${classification.searchQuery}" — flagging for review`);
+  return {
+    cleanPrices: [],
+    rawListingsFound: 0,
+    filteredOut: 0,
+    flaggedForReview: true,
+    flagReason: pcUrl
+      ? 'PriceCharting page found but no prices could be extracted'
+      : 'No PriceCharting listing found for this asset',
+  };
 }
