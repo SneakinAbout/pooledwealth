@@ -35,7 +35,7 @@ ${asset.certNumber ? `- Cert number: ${asset.certNumber}` : ''}
 Return ONLY valid JSON in this exact shape:
 {
   "format": "<one of: single_card_graded | single_card_raw | booster_pack | booster_box | sealed_case | complete_set | sealed_product | memorabilia | collectible_figure | sports_card_graded | sports_card_raw | comic_book | sneakers | watch | art | wine | whisky | other>",
-  "searchQuery": "<specific web search query to find this product on PriceCharting or TCGPlayer — include set name + product type, keep under 10 words>",
+  "searchQuery": "<specific web search query to find this exact product — include set name + product type. For booster_box add '36 packs sealed'; for sealed_case add 'sealed case'; for booster_pack add 'single booster pack'. Keep under 12 words>",
   "formatDescription": "<one sentence describing what this asset is>",
   "priceChartingPath": "<the PriceCharting URL path after /game/ — e.g. 'pokemon-chaos-rising/booster-box' or 'pokemon-base-set/charizard' — use null if unsure>"
 }

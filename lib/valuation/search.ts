@@ -77,13 +77,23 @@ Include ALL prices: pre-order, market, buy-it-now, sealed box prices. If results
     messages: [{
       role: 'user',
       content: `Extract prices from the text below. Asset: "${asset.title}" (${classification.formatDescription}).
+Format type: ${classification.format}
 
 Rules:
 - Convert USD→AUD by multiplying by ${USD_TO_AUD}
-- Include pre-order, market, buy-it-now, and sealed product prices
-- Exclude obviously wrong formats (e.g. single cards when looking for a booster box)
+- Include pre-order, market, and buy-it-now prices for the EXACT product type
 - Round to whole numbers
-- Extract ANY prices present even if the text is incomplete or imperfect
+- Extract ANY matching prices even if the text is incomplete
+
+Format-specific exclusion rules (IMPORTANT):
+${classification.format === 'booster_box'
+  ? '- booster_box: EXCLUDE "bundle", "blister pack", "Elite Trainer Box", "ETB", "booster bundle", single packs. A booster box has 36 packs and should cost $150–600 AUD. Reject any price under $120 AUD as it is almost certainly the wrong product.'
+  : classification.format === 'sealed_case'
+  ? '- sealed_case: EXCLUDE individual booster boxes. A sealed case has 6 booster boxes and should cost $900+ AUD.'
+  : classification.format === 'booster_pack'
+  ? '- booster_pack: EXCLUDE box prices. A single booster pack should cost $5–20 AUD.'
+  : '- Exclude prices for clearly different product types (e.g. single cards when asset is a sealed box).'
+}
 
 Text:
 ${searchText}
