@@ -45,6 +45,7 @@ export default function PurchaseModal({ isOpen, onClose, investment, settings }:
   const router = useRouter();
   const [step, setStep] = useState<Step>('quantity');
   const [units, setUnits] = useState(investment.minimumUnits);
+  const [unitsInput, setUnitsInput] = useState(String(investment.minimumUnits));
   const [loading, setLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -131,6 +132,7 @@ export default function PurchaseModal({ isOpen, onClose, investment, settings }:
   const handleClose = () => {
     setStep('quantity');
     setUnits(investment.minimumUnits);
+    setUnitsInput(String(investment.minimumUnits));
     setFullName('');
     setScrolledToBottom(false);
     onClose();
@@ -280,10 +282,21 @@ export default function PurchaseModal({ isOpen, onClose, investment, settings }:
           <Input
             label="Number of Shares"
             type="number"
-            value={units}
+            value={unitsInput}
             min={investment.minimumUnits}
             max={investment.availableUnits}
-            onChange={(e) => setUnits(Math.max(1, parseInt(e.target.value) || 0))}
+            onChange={(e) => {
+              setUnitsInput(e.target.value);
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed)) {
+                setUnits(Math.min(Math.max(parsed, investment.minimumUnits), investment.availableUnits));
+              }
+            }}
+            onBlur={() => {
+              const clamped = Math.min(Math.max(units, investment.minimumUnits), investment.availableUnits);
+              setUnits(clamped);
+              setUnitsInput(String(clamped));
+            }}
             hint={`Minimum: ${investment.minimumUnits} shares · Available: ${investment.availableUnits.toLocaleString()} shares`}
           />
 
