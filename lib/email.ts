@@ -18,6 +18,7 @@ import ProposalVoteOpened from '../emails/templates/proposal-vote-opened';
 import NewInvestmentsDigest, { type DigestInvestment } from '../emails/templates/new-investments-digest';
 import RecurringDepositReminder from '../emails/templates/recurring-deposit-reminder';
 import RecurringDepositCancelled from '../emails/templates/recurring-deposit-cancelled';
+import PendingDepositsDigest, { type PendingDepositRow } from '../emails/templates/pending-deposits-digest';
 
 const FROM = process.env.EMAIL_FROM || 'Pooled Wealth <noreply@pooledwealth.com>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -128,6 +129,17 @@ export async function sendRecurringDepositCancelled(to: string, name: string, fr
   await send(to, `Your ${freqLabel} recurring deposit schedule has been cancelled`, html);
 }
 
+export async function sendPendingDepositsDigest(
+  to: string,
+  name: string,
+  deposits: PendingDepositRow[],
+  totalAmount: string,
+  date: string,
+) {
+  const html = await render(PendingDepositsDigest({ pendingCount: deposits.length, totalAmount, deposits, date }));
+  await send(to, `${deposits.length} pending deposit${deposits.length !== 1 ? 's' : ''} awaiting review`, html);
+}
+
 export async function sendValuationSummary(
   to: string,
   name: string,
@@ -141,4 +153,4 @@ export async function sendValuationSummary(
   await send(to, `Monthly valuation report — ${month}`, html);
 }
 
-export type { DigestInvestment, ValuationRow };
+export type { DigestInvestment, ValuationRow, PendingDepositRow };

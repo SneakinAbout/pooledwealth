@@ -9,7 +9,7 @@ import Badge from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils';
 import {
   CheckCircle, XCircle, Clock, Upload, FileText,
-  CheckCircle2, AlertTriangle, Minus, X, PlusCircle,
+  CheckCircle2, AlertTriangle, Minus, X, PlusCircle, RefreshCw,
 } from 'lucide-react';
 
 interface Deposit {
@@ -18,6 +18,7 @@ interface Deposit {
   status: string;
   reference: string;
   createdAt: string;
+  isRecurring: boolean;
   user: { id: string; name: string; email: string };
 }
 
@@ -307,6 +308,7 @@ function ManualDepositModal({
         status: 'COMPLETED',
         reference: note || '',
         createdAt: new Date().toISOString(),
+        isRecurring: false,
         user,
       });
       onClose();
@@ -650,7 +652,14 @@ export default function DepositsClient({
                   return (
                     <tr key={d.id} className={`transition-colors hover:bg-[#EDE6D6]/50 ${rowHighlight}`}>
                       <td className="py-3.5">
-                        <p className="font-medium text-[#1A1207]">{d.user.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-[#1A1207]">{d.user.name}</p>
+                          {d.isRecurring && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                              <RefreshCw className="h-2.5 w-2.5" /> Recurring
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-[#6A5A40]">{d.user.email}</p>
                         {(() => {
                           const u = users.find((u) => u.id === d.user.id);

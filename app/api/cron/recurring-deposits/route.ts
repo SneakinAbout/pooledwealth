@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendRecurringDepositReminder, sendRecurringDepositCancelled } from '@/lib/email';
+import { sendRecurringDepositReminder, sendRecurringDepositCancelled, sendPendingDepositsDigest } from '@/lib/email';
 import { addDays, addWeeks } from 'date-fns';
 
 function advanceDate(current: Date, frequency: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'): Date {
@@ -11,12 +11,16 @@ function advanceDate(current: Date, frequency: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTH
   return d;
 }
 
-function windowStart(nextExpected: Date, frequency: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'): Date {
-  if (frequency === 'WEEKLY') return addWeeks(nextExpected, -1);
-  if (frequency === 'FORTNIGHTLY') return addDays(nextExpected, -14);
-  const d = new Date(nextExpected);
-  d.setMonth(d.getMonth() - 1);
-  return d;
+// Count backwards N weekdays (Mon–Fri) from date
+function subtractBusinessDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  let counted = 0;
+  while (counted < days) {
+    result.setDate(result.getDate() - 1);
+    const dow = result.getDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) counted++;
+  }
+  return result;
 }
 
 export async function POST(request: NextRequest) {
@@ -27,85 +31,151 @@ export async function POST(request: NextRequest) {
 
   const now = new Date();
 
+  // ── Step 1: Auto-create PENDING deposits for schedules that are due ──────────
   const due = await prisma.recurringDeposit.findMany({
     where: { status: 'ACTIVE', nextExpectedDate: { lte: now } },
     include: {
       user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          wallet: { select: { id: true } },
-        },
+        select: { id: true, name: true, email: true, depositCode: true },
       },
     },
   });
 
-  let checked = 0, advanced = 0, missed = 0, cancelled = 0;
+  let created = 0;
 
   for (const schedule of due) {
-    checked++;
-    const periodStart = windowStart(schedule.nextExpectedDate, schedule.frequency);
+    const wallet = await prisma.wallet.upsert({
+      where: { userId: schedule.userId },
+      update: {},
+      create: { userId: schedule.userId, balance: 0 },
+    });
 
-    // Check if a completed deposit arrived in the expected window
-    const received = schedule.user.wallet
-      ? await prisma.deposit.findFirst({
-          where: {
-            walletId: schedule.user.wallet.id,
-            status: 'COMPLETED',
-            type: 'BANK_TRANSFER',
-            createdAt: { gte: periodStart, lte: schedule.nextExpectedDate },
-          },
-        })
-      : null;
+    // Create deposit + advance nextExpectedDate atomically so a second cron run
+    // won't find this schedule in the `due` list again.
+    await prisma.$transaction([
+      prisma.deposit.create({
+        data: {
+          walletId: wallet.id,
+          amount: schedule.amount,
+          status: 'PENDING',
+          type: 'BANK_TRANSFER',
+          recurringDepositId: schedule.id,
+          stripePaymentIntentId: schedule.user.depositCode
+            ? `${schedule.user.depositCode}-${Date.now()}`
+            : null,
+        },
+      }),
+      prisma.recurringDeposit.update({
+        where: { id: schedule.id },
+        data: { nextExpectedDate: advanceDate(schedule.nextExpectedDate, schedule.frequency) },
+      }),
+    ]);
 
-    if (received) {
-      // Deposit received — reset and advance
+    created++;
+  }
+
+  // ── Step 2: Expire PENDING recurring deposits older than 5 business days ─────
+  const expiryThreshold = subtractBusinessDays(now, 5);
+
+  const stale = await prisma.deposit.findMany({
+    where: {
+      status: 'PENDING',
+      type: 'BANK_TRANSFER',
+      recurringDepositId: { not: null },
+      createdAt: { lte: expiryThreshold },
+    },
+    include: {
+      recurringDeposit: {
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
+    },
+  });
+
+  let expired = 0, cancelled = 0;
+
+  for (const deposit of stale) {
+    const schedule = deposit.recurringDeposit;
+
+    await prisma.deposit.update({ where: { id: deposit.id }, data: { status: 'FAILED' } });
+
+    if (!schedule || schedule.status !== 'ACTIVE') continue;
+
+    const newMissedCount = schedule.missedCount + 1;
+
+    if (newMissedCount >= 2) {
       await prisma.recurringDeposit.update({
         where: { id: schedule.id },
         data: {
-          missedCount: 0,
-          nextExpectedDate: advanceDate(schedule.nextExpectedDate, schedule.frequency),
+          missedCount: newMissedCount,
+          status: 'CANCELLED',
+          cancelReason: 'Auto-cancelled after 2 unconfirmed deposits',
         },
       });
-      advanced++;
+      sendRecurringDepositCancelled(
+        schedule.user.email,
+        schedule.user.name ?? 'there',
+        schedule.frequency
+      ).catch((err) => console.error('[cron/recurring-deposits] cancel email failed:', err));
+      cancelled++;
     } else {
-      const newMissedCount = schedule.missedCount + 1;
-
-      if (newMissedCount >= 2) {
-        // Auto-cancel after 2 consecutive misses
-        await prisma.recurringDeposit.update({
-          where: { id: schedule.id },
-          data: { missedCount: newMissedCount, status: 'CANCELLED', cancelReason: 'Auto-cancelled after 2 missed deposits' },
-        });
-        sendRecurringDepositCancelled(
-          schedule.user.email,
-          schedule.user.name ?? 'there',
-          schedule.frequency
-        ).catch((err) => console.error('[cron/recurring-deposits] cancel email failed:', err));
-        cancelled++;
-      } else {
-        // First miss — record and send reminder
-        await prisma.recurringDeposit.update({
-          where: { id: schedule.id },
-          data: {
-            missedCount: newMissedCount,
-            nextExpectedDate: advanceDate(schedule.nextExpectedDate, schedule.frequency),
-          },
-        });
-        sendRecurringDepositReminder(
-          schedule.user.email,
-          schedule.user.name ?? 'there',
-          Number(schedule.amount),
-          schedule.frequency,
-          advanceDate(schedule.nextExpectedDate, schedule.frequency)
-        ).catch((err) => console.error('[cron/recurring-deposits] reminder email failed:', err));
-        missed++;
-      }
+      await prisma.recurringDeposit.update({
+        where: { id: schedule.id },
+        data: { missedCount: newMissedCount },
+      });
+      sendRecurringDepositReminder(
+        schedule.user.email,
+        schedule.user.name ?? 'there',
+        Number(schedule.amount),
+        schedule.frequency,
+        schedule.nextExpectedDate
+      ).catch((err) => console.error('[cron/recurring-deposits] reminder email failed:', err));
+      expired++;
     }
   }
 
-  return NextResponse.json({ checked, advanced, missed, cancelled });
+  // ── Step 3: Daily pending-deposits digest to all admins ──────────────────────
+  const pending = await prisma.deposit.findMany({
+    where: { status: 'PENDING', type: 'BANK_TRANSFER' },
+    include: {
+      wallet: { include: { user: { select: { name: true, email: true } } } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let adminNotified = 0;
+
+  if (pending.length > 0) {
+    const fmt = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
+    const msPerDay = 24 * 60 * 60 * 1000;
+
+    const rows = pending.map((d) => ({
+      investorName: d.wallet.user.name,
+      investorEmail: d.wallet.user.email,
+      amount: fmt.format(Number(d.amount)),
+      daysPending: Math.floor((now.getTime() - d.createdAt.getTime()) / msPerDay),
+      isRecurring: d.recurringDepositId !== null,
+    }));
+
+    const totalAmount = fmt.format(pending.reduce((sum, d) => sum + Number(d.amount), 0));
+
+    const today = new Intl.DateTimeFormat('en-AU', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      timeZone: 'Australia/Sydney',
+    }).format(now);
+
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { name: true, email: true },
+    });
+
+    for (const admin of admins) {
+      sendPendingDepositsDigest(admin.email, admin.name, rows, totalAmount, today)
+        .catch((err) => console.error('[cron/recurring-deposits] admin digest failed:', err));
+      adminNotified++;
+    }
+  }
+
+  return NextResponse.json({ created, expired, cancelled, adminNotified });
 }
 
 // cron-jobs.org sends GET by default — delegate to the same handler

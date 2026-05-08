@@ -30,7 +30,7 @@ export async function POST(
     // Fetch deposit for walletId/amount (read-only context)
     const deposit = await prisma.deposit.findUnique({
       where: { id: params.id },
-      include: { wallet: true },
+      include: { wallet: true, recurringDeposit: { select: { id: true } } },
     });
 
     if (!deposit) {
@@ -80,6 +80,14 @@ export async function POST(
 
     if (result === null) {
       return NextResponse.json({ error: 'Deposit has already been processed' }, { status: 409 });
+    }
+
+    // Reset missed-payment counter when a recurring deposit is confirmed
+    if (deposit.recurringDeposit) {
+      await prisma.recurringDeposit.update({
+        where: { id: deposit.recurringDeposit.id },
+        data: { missedCount: 0 },
+      });
     }
 
     await auditLog(session!.user.id, 'APPROVE_BANK_DEPOSIT', deposit.id, {

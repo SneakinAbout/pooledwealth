@@ -38,6 +38,7 @@ export default async function AdminDepositsPage() {
     status: d.status,
     reference: d.stripePaymentIntentId ?? '',
     createdAt: d.createdAt.toISOString(),
+    isRecurring: d.recurringDepositId !== null,
     user: d.wallet.user,
   }));
 
