@@ -16,6 +16,8 @@ interface Holding {
     title: string;
     category: string;
     pricePerUnit: string | number;
+    totalUnits: number;
+    currentValue: number | null;
     targetReturn: string | number;
     status: string;
   };
@@ -54,8 +56,10 @@ export default function HoldingsTable({ holdings }: HoldingsTableProps) {
         </thead>
         <tbody className="divide-y divide-[#E8E2D6]">
           {holdings.map((holding) => {
-            const currentValue =
-              Number(holding.investment.pricePerUnit) * holding.unitsPurchased;
+            const perUnit = holding.investment.currentValue != null
+              ? holding.investment.currentValue / holding.investment.totalUnits
+              : Number(holding.investment.pricePerUnit);
+            const currentValue = perUnit * holding.unitsPurchased;
             const gain = currentValue - Number(holding.purchasePrice);
 
             return (

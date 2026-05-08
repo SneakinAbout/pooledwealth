@@ -30,6 +30,8 @@ export default async function PortfolioPage() {
             title: true,
             category: true,
             pricePerUnit: true,
+            totalUnits: true,
+            currentValue: true,
             targetReturn: true,
             status: true,
             imageUrl: true,
@@ -59,10 +61,13 @@ export default async function PortfolioPage() {
   const completedHoldings = holdings.filter((h) => ['EXITED', 'FAILED'].includes(h.investment.status));
 
   const totalInvested = activeHoldings.reduce((sum, h) => sum + Number(h.purchasePrice), 0);
-  const currentValue = activeHoldings.reduce(
-    (sum, h) => sum + Number(h.investment.pricePerUnit) * h.unitsPurchased,
-    0
-  );
+  const currentValue = activeHoldings.reduce((sum, h) => {
+    const inv = h.investment;
+    const perUnit = inv.currentValue != null
+      ? Number(inv.currentValue) / inv.totalUnits
+      : Number(inv.pricePerUnit);
+    return sum + perUnit * h.unitsPurchased;
+  }, 0);
 
   // For completed holdings, calculate actual return from distribution transactions
   const completedInvestmentIds = completedHoldings.map((h) => h.investmentId);
@@ -93,6 +98,7 @@ export default async function PortfolioPage() {
     investment: {
       ...h.investment,
       pricePerUnit: Number(h.investment.pricePerUnit),
+      currentValue: h.investment.currentValue != null ? Number(h.investment.currentValue) : null,
       targetReturn: Number(h.investment.targetReturn),
     },
   });

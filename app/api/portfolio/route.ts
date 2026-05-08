@@ -19,6 +19,8 @@ export async function GET(_request: NextRequest) {
             title: true,
             category: true,
             pricePerUnit: true,
+            totalUnits: true,
+            currentValue: true,
             targetReturn: true,
             status: true,
             imageUrl: true,
@@ -33,10 +35,13 @@ export async function GET(_request: NextRequest) {
       0
     );
 
-    const currentValue = holdings.reduce(
-      (sum, h) => sum + Number(h.investment.pricePerUnit) * h.unitsPurchased,
-      0
-    );
+    const currentValue = holdings.reduce((sum, h) => {
+      const inv = h.investment;
+      const perUnit = inv.currentValue != null
+        ? Number(inv.currentValue) / inv.totalUnits
+        : Number(inv.pricePerUnit);
+      return sum + perUnit * h.unitsPurchased;
+    }, 0);
 
     return NextResponse.json({
       holdings,
