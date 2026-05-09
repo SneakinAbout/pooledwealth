@@ -42,7 +42,7 @@ export async function POST(
     return NextResponse.json({
       format: classification.format,
       formatDescription: classification.formatDescription,
-      searchQuery: classification.searchQuery,
+      searchQuery: comps.searchQueryUsed ?? classification.searchQuery,
       marketValue: valuation.marketValue,
       confidence: valuation.confidence,
       compCount: valuation.compCount,

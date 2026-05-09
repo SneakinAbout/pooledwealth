@@ -6,6 +6,7 @@ export interface CompResult {
   filteredOut: number;
   flaggedForReview: boolean;
   flagReason?: string;
+  searchQueryUsed?: string;
 }
 
 const EBAY_TOKEN_URL = 'https://api.ebay.com/identity/v1/oauth2/token';
@@ -127,13 +128,27 @@ export async function searchAndExtractComps(
     const token = await getEbayToken();
 
     // Search AU + US in parallel
-    const [auItems, usItems] = await Promise.all([
-      searchMarketplace(token, classification.searchQuery, 'EBAY_AU'),
-      searchMarketplace(token, classification.searchQuery, 'EBAY_US'),
+    let queryUsed = classification.searchQuery;
+    let [auItems, usItems] = await Promise.all([
+      searchMarketplace(token, queryUsed, 'EBAY_AU'),
+      searchMarketplace(token, queryUsed, 'EBAY_US'),
     ]);
 
+    // If no results, retry with a shorter query (first 5 words) to broaden the search
+    if (auItems.length === 0 && usItems.length === 0) {
+      const shorterQuery = queryUsed.split(' ').slice(0, 5).join(' ');
+      if (shorterQuery !== queryUsed) {
+        console.log(`[ebay] no results for "${queryUsed}", retrying with "${shorterQuery}"`);
+        queryUsed = shorterQuery;
+        [auItems, usItems] = await Promise.all([
+          searchMarketplace(token, queryUsed, 'EBAY_AU'),
+          searchMarketplace(token, queryUsed, 'EBAY_US'),
+        ]);
+      }
+    }
+
     const allItems = [...auItems, ...usItems];
-    console.log(`[ebay] ${auItems.length} AU + ${usItems.length} US = ${allItems.length} raw items`);
+    console.log(`[ebay] ${auItems.length} AU + ${usItems.length} US = ${allItems.length} raw items (query: "${queryUsed}")`);
     allItems.slice(0, 8).forEach((item, i) =>
       console.log(`  [${i}] ${item.title} — ${item.price.currency} ${item.price.value}`)
     );
@@ -163,6 +178,7 @@ export async function searchAndExtractComps(
       flagReason: tooFew
         ? `Only ${cleanPrices.length} comparable listing${cleanPrices.length === 1 ? '' : 's'} found`
         : undefined,
+      searchQueryUsed: queryUsed !== classification.searchQuery ? queryUsed : undefined,
     };
   } catch (err) {
     console.error('[ebay] error:', err);
