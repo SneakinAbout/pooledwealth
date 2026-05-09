@@ -101,6 +101,20 @@ interface RecentTransaction {
   units: number | null;
 }
 
+interface PendingValuationItem {
+  id: string;
+  investmentId: string;
+  investmentTitle: string;
+  investmentCategory: string;
+  currentValue: number | null;
+  marketValue: number;
+  confidence: string;
+  compCount: number;
+  searchQuery: string;
+  flagReason: string | null;
+  createdAt: string;
+}
+
 interface Props {
   stats: Stats;
   pendingDeposits: PendingDeposit[];
@@ -108,6 +122,7 @@ interface Props {
   passedProposals: PassedProposal[];
   pendingKycUsers: PendingKycUser[];
   pendingWithdrawals: PendingWithdrawal[];
+  pendingValuations: PendingValuationItem[];
   recentTransactions: RecentTransaction[];
 }
 
@@ -157,21 +172,23 @@ export default function AdminDashboardClient({
   passedProposals: initialPassed,
   pendingKycUsers: initialKyc,
   pendingWithdrawals: initialWithdrawals,
+  pendingValuations: initialValuations,
   recentTransactions,
 }: Props) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'deposits' | 'proposals' | 'passed' | 'kyc' | 'withdrawals'>('deposits');
+  const [activeTab, setActiveTab] = useState<'deposits' | 'proposals' | 'passed' | 'kyc' | 'withdrawals' | 'valuations'>('deposits');
   const [deposits, setDeposits] = useState(initialDeposits);
   const [proposals, setProposals] = useState(initialProposals);
   const [passedProposals, setPassedProposals] = useState(initialPassed);
   const [kycUsers, setKycUsers] = useState(initialKyc);
   const [withdrawals, setWithdrawals] = useState(initialWithdrawals);
+  const [valuations, setValuations] = useState(initialValuations);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [downloadingCsv, setDownloadingCsv] = useState(false);
   const [rejectProposalId, setRejectProposalId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const totalPending = deposits.length + proposals.length + passedProposals.length + kycUsers.length + withdrawals.length;
+  const totalPending = deposits.length + proposals.length + passedProposals.length + kycUsers.length + withdrawals.length + valuations.length;
 
   // ── Deposit actions ──────────────────────────────────────────────────────
 
@@ -323,13 +340,37 @@ export default function AdminDashboardClient({
     }
   }
 
+  // ── Pending valuation actions ────────────────────────────────────────────
+
+  async function handleValuation(id: string, action: 'approve' | 'reject') {
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/admin/pending-valuations/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        toast.error(d.error ?? 'Action failed');
+        return;
+      }
+      toast.success(action === 'approve' ? 'Valuation approved & applied' : 'Valuation rejected');
+      setValuations((prev) => prev.filter((v) => v.id !== id));
+      router.refresh();
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   // ── Tab config ───────────────────────────────────────────────────────────
 
   const tabs = [
     { key: 'deposits' as const, label: 'Bank Deposits', count: deposits.length, icon: Landmark },
     { key: 'withdrawals' as const, label: 'Withdrawals', count: withdrawals.length, icon: ArrowDownLeft },
+    { key: 'valuations' as const, label: 'Valuations', count: valuations.length, icon: Sparkles },
     { key: 'proposals' as const, label: 'Draft Proposals', count: proposals.length, icon: Vote },
-    { key: 'passed' as const, label: 'To Implement', count: passedProposals.length, icon: Sparkles },
+    { key: 'passed' as const, label: 'To Implement', count: passedProposals.length, icon: CheckCircle2 },
     { key: 'kyc' as const, label: 'KYC Pending', count: kycUsers.length, icon: ShieldCheck },
   ];
 
@@ -402,6 +443,7 @@ export default function AdminDashboardClient({
                 const shortLabel: Record<string, string> = {
                   deposits: 'Deposits',
                   withdrawals: 'Withdrawals',
+                  valuations: 'Valuations',
                   proposals: 'Proposals',
                   passed: 'Implement',
                   kyc: 'KYC',
@@ -703,6 +745,94 @@ export default function AdminDashboardClient({
                       </div>
                     ))}
                   </>
+                )
+              )}
+
+              {/* ── Pending Valuations ── */}
+              {activeTab === 'valuations' && (
+                valuations.length === 0 ? (
+                  <EmptyState icon={Sparkles} message="No flagged valuations awaiting review" />
+                ) : (
+                  valuations.map((v) => {
+                    const confColor =
+                      v.confidence === 'low' ? 'text-[#8A4A00] bg-[#FFF3E0]' :
+                      v.confidence === 'insufficient' ? 'text-[#9B2C2C] bg-[#FDF0F0]' :
+                      'text-[#6A5A40] bg-[#EDE6D6]';
+                    const delta = v.currentValue !== null ? v.marketValue - v.currentValue : null;
+                    return (
+                      <div key={v.id} className="p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="h-9 w-9 rounded-full bg-[#FDF8ED] flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Sparkles className="h-4 w-4 text-[#C9A84C]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${confColor}`}>
+                                {v.confidence} confidence
+                              </span>
+                              <Link
+                                href={`/investments/${v.investmentId}`}
+                                className="text-xs text-[#1565C0] hover:underline truncate flex items-center gap-0.5"
+                              >
+                                {v.investmentTitle}
+                                <ArrowUpRight className="h-3 w-3 flex-shrink-0" />
+                              </Link>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1.5">
+                              <div>
+                                <p className="text-[10px] text-[#8A7A60] uppercase tracking-widest">Current</p>
+                                <p className="text-sm font-semibold text-[#8A7A60]">
+                                  {v.currentValue !== null ? formatCurrency(v.currentValue) : '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-[#8A7A60] uppercase tracking-widest">Suggested</p>
+                                <p className="text-sm font-bold text-[#1A1207]">{formatCurrency(v.marketValue)}</p>
+                              </div>
+                              {delta !== null && (
+                                <div>
+                                  <p className="text-[10px] text-[#8A7A60] uppercase tracking-widest">Change</p>
+                                  <p className={`text-sm font-semibold ${delta >= 0 ? 'text-[#1E5E38]' : 'text-[#9B2C2C]'}`}>
+                                    {delta >= 0 ? '+' : ''}{formatCurrency(delta)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            {v.flagReason && (
+                              <p className="text-[10px] text-[#92600A] mt-1.5 bg-[#FEF9EC] rounded px-2 py-1 border border-[#F0D060]/30">
+                                {v.flagReason}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-[#8A7A60] mt-1">
+                              {v.compCount} comp{v.compCount !== 1 ? 's' : ''} · query: <code className="font-mono">{v.searchQuery}</code> · {formatDate(v.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="ml-12 flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleValuation(v.id, 'approve')}
+                            disabled={loadingId === v.id}
+                            className="flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Approve & Apply
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleValuation(v.id, 'reject')}
+                            disabled={loadingId === v.id}
+                            className="flex items-center gap-1 text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )
               )}
 

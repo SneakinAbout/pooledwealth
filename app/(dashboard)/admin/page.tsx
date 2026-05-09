@@ -23,6 +23,7 @@ export default async function AdminDashboardPage() {
     totalDistributed,
     passedProposals,
     pendingWithdrawals,
+    pendingValuations,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.wallet.aggregate({ _sum: { balance: true } }),
@@ -77,11 +78,17 @@ export default async function AdminDashboardPage() {
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
+    prisma.pendingValuation.findMany({
+      where: { status: 'PENDING' },
+      include: { investment: { select: { id: true, title: true, category: true, currentValue: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    }),
   ]);
 
   const totalAUM = Number(walletAggregate._sum.balance ?? 0);
   const pendingActionsCount =
-    pendingDeposits.length + draftProposals.length + pendingKycUsers.length + passedProposals.length + pendingWithdrawals.length;
+    pendingDeposits.length + draftProposals.length + pendingKycUsers.length + passedProposals.length + pendingWithdrawals.length + pendingValuations.length;
 
   return (
     <AdminDashboardClient
@@ -138,6 +145,19 @@ export default async function AdminDashboardPage() {
         userName: w.user.name,
         userEmail: w.user.email,
         userId: w.user.id,
+      }))}
+      pendingValuations={pendingValuations.map((v) => ({
+        id: v.id,
+        investmentId: v.investmentId,
+        investmentTitle: v.investment.title,
+        investmentCategory: v.investment.category,
+        currentValue: v.investment.currentValue ? Number(v.investment.currentValue) : null,
+        marketValue: Number(v.marketValue),
+        confidence: v.confidence,
+        compCount: v.compCount,
+        searchQuery: v.searchQuery,
+        flagReason: v.flagReason,
+        createdAt: v.createdAt.toISOString(),
       }))}
       recentTransactions={recentTransactions.map((t) => ({
         id: t.id,

@@ -22,6 +22,7 @@ import InvestmentAdminSection from '@/components/investments/InvestmentAdminSect
 import ProposalList from '@/components/investments/ProposalList';
 import InvestmentUpdates from '@/components/investments/InvestmentUpdates';
 import ValuationWidget from '@/components/investments/ValuationWidget';
+import ValuationChart from '@/components/investments/ValuationChart';
 import { formatCurrency, formatDate, calculateProgress } from '@/lib/utils';
 
 interface Investment {
@@ -222,13 +223,14 @@ export default function InvestmentDetailClient({ investment, settings, canInvest
 
             {/* Valuation — shown to admin/manager (can edit) and owners (read-only) */}
             {(isAdmin || isManager || isOwner) && (
-              <div className="mb-5">
+              <div className="mb-5 space-y-4">
                 <ValuationWidget
                   investmentId={investment.id}
                   currentValue={investment.currentValue ?? null}
                   totalCostBasis={adminData?.totalCostBasis ?? (investment.pricePerUnit * (investment.totalUnits - investment.availableUnits))}
                   canEdit={isAdmin || isManager}
                 />
+                <ValuationChart investmentId={investment.id} />
               </div>
             )}
 

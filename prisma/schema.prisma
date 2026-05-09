@@ -23,6 +23,17 @@ enum InvestmentStatus {
   ARCHIVED
 }
 
+enum PendingValuationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ValuationSource {
+  AUTO
+  MANUAL
+}
+
 enum RecurringFrequency {
   WEEKLY
   FORTNIGHTLY
@@ -131,6 +142,7 @@ model User {
   trustDisbursements    TrustDisbursement[]
   trustFeeExtractions   TrustFeeExtraction[]
   profitShareSweeps     Distribution[]       @relation("ProfitShareSweeps")
+  pendingValuationReviews PendingValuation[] @relation("PendingValuationReviews")
 
   @@map("users")
 }
@@ -210,6 +222,8 @@ model Investment {
   watchlistItems     WatchlistItem[]
   assetSupplements   AssetSupplement[]
   trustDisbursement  TrustDisbursement?
+  pendingValuations  PendingValuation[]
+  valuationSnapshots ValuationSnapshot[]
 
   @@index([status])
   @@index([createdAt])
@@ -568,4 +582,46 @@ model TrustDisbursement {
 
   @@index([investmentId])
   @@map("trust_disbursements")
+}
+
+// Flagged AI valuations awaiting admin/manager review before being applied
+model PendingValuation {
+  id           String                 @id @default(cuid())
+  investmentId String
+  investment   Investment             @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  marketValue  Decimal                @db.Decimal(18, 2)
+  confidence   String                 // high | medium | low | insufficient
+  compCount    Int
+  searchQuery  String
+  flagReason   String?
+  status       PendingValuationStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?                  @relation("PendingValuationReviews", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+
+  createdAt    DateTime               @default(now())
+
+  @@index([investmentId])
+  @@index([status])
+  @@map("pending_valuations")
+}
+
+// Approved valuation snapshots — one row per accepted value, used for history charts
+model ValuationSnapshot {
+  id           String          @id @default(cuid())
+  investmentId String
+  investment   Investment      @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  value        Decimal         @db.Decimal(18, 2)
+  confidence   String?         // high | medium | low | null for MANUAL
+  compCount    Int?
+  source       ValuationSource // AUTO | MANUAL
+
+  createdAt    DateTime        @default(now())
+
+  @@index([investmentId])
+  @@index([createdAt])
+  @@map("valuation_snapshots")
 }

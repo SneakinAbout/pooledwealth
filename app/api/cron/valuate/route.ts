@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
 
   const rows: ValuationRow[] = [];
   let updatedCount = 0;
+  let pendingCount = 0;
   let flaggedCount = 0;
   let skippedCount = 0;
 
@@ -52,11 +53,38 @@ export async function GET(request: NextRequest) {
       const oldValue = inv.currentValue ? parseFloat(inv.currentValue.toString()) : null;
 
       if (valuation.marketValue !== null) {
-        await prisma.investment.update({
-          where: { id: inv.id },
-          data: { currentValue: new Decimal(valuation.marketValue) },
-        });
-        updatedCount++;
+        if (valuation.flaggedForReview) {
+          // Low-confidence result — queue for manual approval instead of auto-applying
+          await prisma.pendingValuation.create({
+            data: {
+              investmentId: inv.id,
+              marketValue: new Decimal(valuation.marketValue),
+              confidence: valuation.confidence,
+              compCount: valuation.compCount,
+              searchQuery: comps.searchQueryUsed ?? classification.searchQuery,
+              flagReason: valuation.flagReason,
+            },
+          });
+          pendingCount++;
+        } else {
+          // High/medium confidence — apply immediately and record snapshot
+          await prisma.$transaction([
+            prisma.investment.update({
+              where: { id: inv.id },
+              data: { currentValue: new Decimal(valuation.marketValue) },
+            }),
+            prisma.valuationSnapshot.create({
+              data: {
+                investmentId: inv.id,
+                value: new Decimal(valuation.marketValue),
+                confidence: valuation.confidence,
+                compCount: valuation.compCount,
+                source: 'AUTO',
+              },
+            }),
+          ]);
+          updatedCount++;
+        }
       } else {
         skippedCount++;
       }
@@ -116,9 +144,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  console.log(`[cron/valuate] ${monthLabel}: updated=${updatedCount} flagged=${flaggedCount} skipped=${skippedCount}`);
+  console.log(`[cron/valuate] ${monthLabel}: updated=${updatedCount} pending=${pendingCount} flagged=${flaggedCount} skipped=${skippedCount}`);
 
-  return NextResponse.json({ ok: true, month: monthLabel, updatedCount, flaggedCount, skippedCount });
+  return NextResponse.json({ ok: true, month: monthLabel, updatedCount, pendingCount, flaggedCount, skippedCount });
 }
 
 function formatAUD(value: number): string {

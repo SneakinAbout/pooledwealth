@@ -88,11 +88,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const updated = await prisma.investment.update({
-      where: { id: params.id },
-      data: { currentValue: parsed.data.currentValue },
-      select: { id: true, currentValue: true },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.investment.update({
+        where: { id: params.id },
+        data: { currentValue: parsed.data.currentValue },
+        select: { id: true, currentValue: true },
+      }),
+      prisma.valuationSnapshot.create({
+        data: {
+          investmentId: params.id,
+          value: parsed.data.currentValue,
+          source: 'MANUAL',
+        },
+      }),
+    ]);
 
     return NextResponse.json({ currentValue: Number(updated.currentValue) });
   } catch (err) {
