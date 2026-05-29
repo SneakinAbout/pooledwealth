@@ -31,6 +31,12 @@ export async function GET(
       return NextResponse.json({ error: 'Investment not found' }, { status: 404 });
     }
 
+    const isManagerOrAbove =
+      session?.user.role === 'ADMIN' || session?.user.role === 'MANAGER';
+    if (investment.visibleTo === 'MANAGERS_ABOVE' && !isManagerOrAbove) {
+      return NextResponse.json({ error: 'Investment not found' }, { status: 404 });
+    }
+
     return NextResponse.json(investment);
   } catch (err) {
     console.error('[GET /api/investments/[id]]', err);

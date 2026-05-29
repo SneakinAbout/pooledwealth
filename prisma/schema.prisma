@@ -23,6 +23,11 @@ enum InvestmentStatus {
   ARCHIVED
 }
 
+enum InvestmentVisibility {
+  ALL
+  MANAGERS_ABOVE
+}
+
 enum PendingValuationStatus {
   PENDING
   APPROVED
@@ -196,8 +201,9 @@ model Investment {
   startDate      DateTime
   endDate        DateTime
   imageUrl       String?
-  locked         Boolean          @default(false)
-  featuredOnHome Boolean          @default(false)
+  locked         Boolean              @default(false)
+  featuredOnHome Boolean              @default(false)
+  visibleTo      InvestmentVisibility @default(ALL)
   reservePrice   Decimal?         @db.Decimal(18, 2)
   currentValue   Decimal?         @db.Decimal(18, 2) // admin/manager updated valuation
 

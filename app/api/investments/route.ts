@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
     if (isPublicOrInvestor) {
       where.status = 'ACTIVE';
+      where.visibleTo = 'ALL';
     } else if (status) {
       where.status = status;
     }

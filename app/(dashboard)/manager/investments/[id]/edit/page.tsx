@@ -53,6 +53,13 @@ export default async function EditInvestmentPage({
             startDate: investment.startDate.toISOString().split('T')[0],
             endDate: investment.endDate.toISOString().split('T')[0],
             imageUrl: investment.imageUrl ?? '',
+            visibleTo: investment.visibleTo,
+            edition: investment.edition ?? '',
+            grade: investment.grade ?? '',
+            gradingCompany: investment.gradingCompany ?? '',
+            certNumber: investment.certNumber ?? '',
+            acquisitionPrice: investment.acquisitionPrice ? Number(investment.acquisitionPrice) : undefined,
+            acquisitionDate: investment.acquisitionDate ? investment.acquisitionDate.toISOString().split('T')[0] : '',
           }}
         />
       </Card>

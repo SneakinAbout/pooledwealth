@@ -37,6 +37,7 @@ export const investmentSchemaBase = z.object({
   certNumber: z.string().max(200).optional().or(z.literal('')),
   acquisitionPrice: z.number().positive('Acquisition price must be positive').optional(),
   acquisitionDate: z.string().refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid acquisition date').optional().or(z.literal('')),
+  visibleTo: z.enum(['ALL', 'MANAGERS_ABOVE']).optional().default('ALL'),
 });
 
 // Full schema with cross-field date validation — use for creates

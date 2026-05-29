@@ -26,6 +26,11 @@ const STATUSES = [
   { value: 'CLOSED', label: 'Closed' },
 ];
 
+const VISIBILITY_OPTIONS = [
+  { value: 'ALL', label: 'Everyone (all investors)' },
+  { value: 'MANAGERS_ABOVE', label: 'Managers & Admins only' },
+];
+
 interface InvestmentFormProps {
   initial?: Partial<InvestmentInput> & { id?: string };
   mode: 'create' | 'edit';
@@ -42,6 +47,7 @@ export default function InvestmentForm({ initial, mode }: InvestmentFormProps) {
   } = useForm<InvestmentInput>({
     resolver: zodResolver(investmentSchemaBase),
     defaultValues: {
+      visibleTo: initial?.visibleTo ?? 'ALL',
       title: initial?.title ?? '',
       description: initial?.description ?? '',
       category: initial?.category ?? 'Pokemon TCG',
@@ -134,6 +140,13 @@ export default function InvestmentForm({ initial, mode }: InvestmentFormProps) {
           options={STATUSES}
           error={errors.status?.message}
           {...register('status')}
+        />
+
+        <Select
+          label="Visible To"
+          options={VISIBILITY_OPTIONS}
+          error={errors.visibleTo?.message}
+          {...register('visibleTo')}
         />
 
         <Input
