@@ -71,6 +71,7 @@ export async function autoAllocateToPlatform(investmentId: string): Promise<{ un
   });
 
   if (!investment) throw new Error('Investment not found');
+  if (investment.status === 'ACTIVE') throw new Error('Cannot auto-allocate while investment is still ACTIVE — close it first');
   if (investment.availableUnits === 0) throw new Error('No unallocated units remaining');
 
   const platformUser = await prisma.user.findFirst({

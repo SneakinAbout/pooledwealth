@@ -24,7 +24,10 @@ export async function POST(
     if (e.message === 'Investment not found' || e.message === 'No platform admin user found') {
       return NextResponse.json({ error: e.message }, { status: 404 });
     }
-    if (e.message === 'No unallocated units remaining') {
+    if (
+      e.message === 'No unallocated units remaining' ||
+      e.message?.startsWith('Cannot auto-allocate while investment is still ACTIVE')
+    ) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
     console.error('[POST /api/admin/investments/[id]/auto-allocate]', err);

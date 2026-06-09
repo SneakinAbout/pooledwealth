@@ -49,10 +49,18 @@ export async function POST(
       }
 
       const soldUnits = investment.totalUnits - investment.availableUnits;
-      const totalRaised = Number(investment.pricePerUnit) * soldUnits;
       const minimumRaise = Number(investment.minimumRaise ?? 0);
       // minimumRaise is a unit count; compare sold units (not dollars) to the minimum
       const minimumMet = minimumRaise === 0 || soldUnits >= minimumRaise;
+
+      // Sum actual PURCHASE transactions rather than pricePerUnit × soldUnits so that
+      // the figure reflects real investor capital regardless of whether auto-allocation
+      // ran beforehand (which sets availableUnits → 0 without any wallet movement).
+      const purchaseAgg = await tx.transaction.aggregate({
+        where: { investmentId: params.id, type: 'PURCHASE', status: 'COMPLETED' },
+        _sum: { amount: true },
+      });
+      const totalRaised = Number(purchaseAgg._sum.amount ?? 0);
 
       if (minimumMet) {
         // Success — close, lock, and create trust disbursement record
