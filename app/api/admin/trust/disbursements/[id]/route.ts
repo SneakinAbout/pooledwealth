@@ -41,7 +41,9 @@ export async function PATCH(
     const updated = await prisma.trustDisbursement.update({
       where: { id: params.id },
       data: {
-        ...(data.vendorAmount !== undefined && { vendorAmount: data.vendorAmount }),
+        // Keep totalRaised in sync with the admin-confirmed vendor amount so the
+        // Capital Raised column stays accurate even after a correction.
+        ...(data.vendorAmount !== undefined && { vendorAmount: data.vendorAmount, totalRaised: data.vendorAmount }),
         ...(data.disbursedAt !== undefined && { disbursedAt: new Date(data.disbursedAt) }),
         ...(data.disbursementRef !== undefined && { disbursementRef: data.disbursementRef }),
         ...(data.notes !== undefined && { notes: data.notes }),
